@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OurNest — Where your family talks.</title>
+  <meta name="description" content="OurNest is a private, family-only messenger with end-to-end encryption, audience controls (Everyone vs Selected), and shared wake-up alarms for Android and iOS. Developed by ARKIS PTE LTD.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+:root {
+  --primary-teal: #1F5C57;
+  --primary-teal-dark: #143D39;
+  --primary-teal-light: #2E8079;
+  --accent-coral: #E07A4F;
+  --accent-coral-dark: #BA5A32;
+  --accent-coral-light: #EA9673;
+  --bg-sand: #F7F4EE;
+  --surface-white: #FFFFFF;
+  --text-dark: #1E2B2A;
+  --text-muted: #4A5856;
+  --border-light: #E5E0D5;
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --shadow-soft: 0 10px 30px rgba(31, 92, 87, 0.08);
+  --shadow-strong: 0 20px 40px rgba(20, 61, 57, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-sand);
+  color: var(--text-dark);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Navbar */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(247, 244, 238, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-light);
+  padding: 14px 24px;
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wordmark {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+}
+
+.wordmark .our {
+  color: var(--primary-teal);
+}
+
+.wordmark .nest {
+  color: var(--accent-coral);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 16px;
+  transition: color 0.2s ease;
+}
+
+.nav-links a:hover {
+  color: var(--primary-teal);
+}
+
+.nav-cta {
+  background: var(--primary-teal);
+  color: #FFFFFF !important;
+  padding: 10px 22px;
+  border-radius: 30px;
+  transition: all 0.25s ease;
+}
+
+.nav-cta:hover {
+  background: var(--primary-teal-light);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(31, 92, 87, 0.25);
+}
+
+/* Hero Section */
+.hero-section {
+  max-width: 1200px;
+  margin: 60px auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  align-items: center;
+  gap: 60px;
+}
+
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(31, 92, 87, 0.1);
+  color: var(--primary-teal);
+  padding: 8px 16px;
+  border-radius: 30px;
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.hero-title {
+  font-size: 58px;
+  font-weight: 900;
+  line-height: 1.15;
+  color: var(--primary-teal-dark);
+  margin-bottom: 20px;
+}
+
+.coral-highlight {
+  color: var(--accent-coral);
+}
+
+.hero-subtitle {
+  font-size: 20px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 36px;
+  max-width: 560px;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.store-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: all 0.25s ease;
+  min-width: 210px;
+  box-shadow: var(--shadow-soft);
+}
+
+.android-btn {
+  background: var(--primary-teal);
+  color: #FFFFFF;
+}
+
+.android-btn:hover {
+  background: var(--primary-teal-dark);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-strong);
+}
+
+.ios-btn {
+  background: #1E2B2A;
+  color: #FFFFFF;
+}
+
+.ios-btn:hover {
+  background: #000000;
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-strong);
+}
+
+.desktop-btn {
+  background: var(--accent-coral);
+  color: #FFFFFF;
+}
+
+.desktop-btn:hover {
+  background: var(--accent-coral-dark);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-strong);
+}
+
+.store-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.store-text .subtext {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.store-text .maintext {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.elderly-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-teal);
+  background: #FFFFFF;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  width: fit-content;
+}
+
+.elderly-badge .check-icon {
+  background: var(--primary-teal);
+  color: #FFFFFF;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* Phone Mockup */
+.hero-mockup {
+  display: flex;
+  justify-content: center;
+}
+
+.phone-frame {
+  width: 340px;
+  height: 640px;
+  background: #FFFFFF;
+  border-radius: 46px;
+  box-shadow: var(--shadow-strong), 0 0 0 10px #1E2B2A;
+  border: 4px solid #1E2B2A;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.phone-notch {
+  width: 140px;
+  height: 24px;
+  background: #1E2B2A;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  z-index: 10;
+}
+
+.mockup-header {
+  padding: 36px 16px 12px 16px;
+  background: var(--bg-sand);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mockup-family-name {
+  display: block;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--text-dark);
+}
+
+.mockup-e2ee-tag {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-teal);
+}
+
+.mockup-avatar {
+  background: rgba(31, 92, 87, 0.15);
+  border-radius: 50%;
+  padding: 6px 10px;
+  font-size: 18px;
+}
+
+.mockup-chat-body {
+  flex: 1;
+  background: var(--bg-sand);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: hidden;
+}
+
+.mockup-bubble {
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 13.5px;
+  position: relative;
+}
+
+.mockup-bubble.other {
+  align-self: flex-start;
+  background: #FFFFFF;
+  color: var(--text-dark);
+  border: 1px solid var(--border-light);
+  border-bottom-left-radius: 4px;
+}
+
+.mockup-bubble.mine {
+  align-self: flex-end;
+  background: var(--primary-teal);
+  color: #FFFFFF;
+  border-bottom-right-radius: 4px;
+}
+
+.sender-tag {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent-coral-dark);
+  margin-bottom: 2px;
+}
+
+.selected-pill {
+  display: inline-block;
+  background: rgba(31, 92, 87, 0.12);
+  color: var(--primary-teal);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.msg-time {
+  display: block;
+  text-align: right;
+  font-size: 9.5px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+/* Shared Alarm Mockup Card */
+.mockup-alarm-card {
+  background: #FFFFFF;
+  border: 1.5px solid var(--accent-coral);
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 10px rgba(224, 122, 79, 0.12);
+}
+
+.alarm-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alarm-icon {
+  font-size: 22px;
+}
+
+.alarm-title {
+  display: block;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--accent-coral-dark);
+}
+
+.alarm-subtitle {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.alarm-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.alarm-badge {
+  background: rgba(224, 122, 79, 0.15);
+  color: var(--accent-coral-dark);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.alarm-status {
+  color: #2E7D32;
+}
+
+.mockup-input-bar {
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mockup-audience-pill {
+  background: var(--primary-teal);
+  color: #FFFFFF;
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.mockup-input-field {
+  flex: 1;
+  background: var(--bg-sand);
+  padding: 8px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.mockup-send-btn {
+  background: var(--primary-teal);
+  color: #FFFFFF;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* Features Section */
+.features-section {
+  max-width: 1200px;
+  margin: 100px auto;
+  padding: 0 24px;
+}
+
+.section-header {
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto 60px auto;
+}
+
+.section-title {
+  font-size: 42px;
+  font-weight: 900;
+  color: var(--primary-teal-dark);
+  margin-bottom: 12px;
+}
+
+.section-desc {
+  font-size: 19px;
+  color: var(--text-muted);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 30px;
+}
+
+.feature-card {
+  background: var(--surface-white);
+  padding: 36px 28px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-strong);
+}
+
+.feature-icon-wrapper {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.teal-icon {
+  background: rgba(31, 92, 87, 0.12);
+}
+
+.coral-icon {
+  background: rgba(224, 122, 79, 0.15);
+}
+
+.feature-heading {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-dark);
+  margin-bottom: 10px;
+}
+
+.feature-text {
+  font-size: 16px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+/* Download Section */
+.download-section {
+  max-width: 1200px;
+  margin: 80px auto;
+  padding: 0 24px;
+}
+
+.download-box {
+  background: linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-teal-dark) 100%);
+  color: #FFFFFF;
+  border-radius: 36px;
+  padding: 60px;
+  display: grid;
+  grid-template-columns: 1.4fr 0.6fr;
+  align-items: center;
+  gap: 40px;
+  box-shadow: var(--shadow-strong);
+}
+
+.download-title {
+  font-size: 40px;
+  font-weight: 900;
+  margin-bottom: 14px;
+}
+
+.download-desc {
+  font-size: 19px;
+  opacity: 0.9;
+  margin-bottom: 30px;
+  max-width: 500px;
+}
+
+.download-buttons-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.download-buttons-row .store-btn {
+  background: #FFFFFF;
+  color: var(--primary-teal);
+  font-weight: 800;
+}
+
+.download-buttons-row .store-btn:hover {
+  background: var(--bg-sand);
+  color: var(--primary-teal-dark);
+}
+
+.download-qr-side {
+  display: flex;
+  justify-content: center;
+}
+
+.qr-card {
+  background: #FFFFFF;
+  color: var(--text-dark);
+  padding: 24px;
+  border-radius: 24px;
+  text-align: center;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+}
+
+.qr-label {
+  display: block;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary-teal);
+}
+
+/* Footer */
+.footer {
+  background: var(--surface-white);
+  border-top: 1px solid var(--border-light);
+  padding: 40px 24px;
+  margin-top: 60px;
+}
+
+.footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.footer-tagline {
+  font-size: 15px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.footer-legal {
+  text-align: right;
+  font-size: 14.5px;
+  color: var(--text-muted);
+}
+
+.copyright-line {
+  margin-bottom: 4px;
+}
+
+.developer-line strong {
+  color: var(--primary-teal);
+  font-weight: 800;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .hero-section {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 40px;
+  }
+
+  .hero-subtitle {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hero-actions {
+    justify-content: center;
+  }
+
+  .elderly-badge {
+    margin: 0 auto;
+  }
+
+  .download-box {
+    grid-template-columns: 1fr;
+    text-align: center;
+    padding: 40px 24px;
+  }
+
+  .download-desc {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .download-buttons-row {
+    justify-content: center;
+  }
+
+  .footer-container {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .footer-legal {
+    text-align: center;
+  }
+}
+
+/* iOS Waitlist Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 61, 57, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  padding: 20px;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-card {
+  background: var(--surface-white);
+  border-radius: var(--radius-lg);
+  max-width: 480px;
+  width: 100%;
+  padding: 36px 32px;
+  box-shadow: 0 24px 60px rgba(20, 61, 57, 0.25);
+  border: 1px solid var(--border-light);
+  position: relative;
+  transform: translateY(20px) scale(0.96);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: center;
+}
+
+.modal-overlay.active .modal-card {
+  transform: translateY(0) scale(1);
+}
+
+.modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background 0.2s, color 0.2s;
+}
+
+.modal-close:hover {
+  background: var(--bg-sand);
+  color: var(--text-dark);
+}
+
+.modal-icon-badge {
+  width: 64px;
+  height: 64px;
+  background: rgba(224, 122, 79, 0.12);
+  color: var(--accent-coral);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+}
+
+.modal-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--primary-teal-dark);
+  margin-bottom: 10px;
+}
+
+.modal-desc {
+  font-size: 15px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  line-height: 1.55;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.modal-input:focus {
+  border-color: var(--primary-teal);
+  box-shadow: 0 0 0 3px rgba(31, 92, 87, 0.15);
+}
+
+.modal-btn {
+  background: var(--accent-coral);
+  color: #fff;
+  border: none;
+  padding: 14px 20px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: inherit;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.modal-btn:hover {
+  background: var(--accent-coral-dark);
+}
+
+.modal-btn:active {
+  transform: scale(0.98);
+}
+
+.modal-success {
+  display: none;
+  background: rgba(31, 92, 87, 0.08);
+  border: 1px solid var(--primary-teal-light);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  color: var(--primary-teal-dark);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+
+</style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="logo-wrapper">
+        <svg class="nest-logo" viewBox="0 0 100 100" width="44" height="44">
+          <!-- Figures: Left Parent (Teal) -->
+          <circle cx="32" cy="38" r="12" fill="#1F5C57" />
+          <ellipse cx="32" cy="56" rx="13" ry="15" fill="#1F5C57" />
+          <!-- Figures: Right Parent (Teal) -->
+          <circle cx="68" cy="38" r="12" fill="#1F5C57" />
+          <ellipse cx="68" cy="56" rx="13" ry="15" fill="#1F5C57" />
+          <!-- Figures: Child (Warm Coral) -->
+          <circle cx="50" cy="44" r="9.5" fill="#E07A4F" />
+          <ellipse cx="50" cy="60" rx="9.5" ry="9.5" fill="#E07A4F" />
+          <!-- Nest Bowl -->
+          <path d="M 14 62 C 18 90, 82 90, 86 62" fill="none" stroke="#143D39" stroke-width="8" stroke-linecap="round" />
+          <!-- Nest Rim -->
+          <path d="M 10 62 Q 50 66, 90 62" fill="none" stroke="#1F5C57" stroke-width="8" stroke-linecap="round" />
+        </svg>
+        <span class="wordmark"><span class="our">Our</span><span class="nest">Nest</span></span>
+      </div>
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#family-tree">Family Tree &amp; Peace</a>
+        <a href="#install-guide">Install Guide (Android / iOS / PC)</a>
+        <a href="ournest.apk?v=1.2.1" download="OurNest-v1.2.1.apk" class="nav-cta">Download App (v1.2.1)</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="hero-content">
+      <div class="badge-pill">
+        <span class="lock-icon">🔒</span> 100% Private &amp; Closed Family Circle
+      </div>
+      <h1 class="hero-title">Where your family <span class="coral-highlight">talks.</span></h1>
+      <p class="hero-subtitle">
+        A private messenger designed exclusively for families. No outsiders, zero spam, military-grade end-to-end encryption, live GPS location sharing, and shared alarms that make sure your loved ones wake up on time.
+      </p>
+
+      <div class="hero-actions" id="download">
+        <!-- 1. Android APK Download -->
+        <a href="ournest.apk?v=1.2.1" download="OurNest-v1.2.1.apk" class="store-btn android-btn">
+          <svg class="store-icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+            <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-1.0001 0-.5515.4482-1.0001.9993-1.0001.5516 0 .9997.4486.9997 1.0001 0 .5515-.4481 1.0001-.9997 1.0001m-11.046 0c-.5511 0-.9993-.4486-.9993-1.0001 0-.5515.4482-1.0001.9993-1.0001.5516 0 .9997.4486.9997 1.0001 0 .5515-.4481 1.0001-.9997 1.0001m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.4116 13.8533 8.125 12 8.125c-1.8533 0-3.5902.2866-5.1368.8247L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.75h24c-.3432-4.0911-2.6889-7.5633-6.1185-9.4286"/>
+          </svg>
+          <div class="store-text">
+            <span class="subtext">Download Latest APK</span>
+            <span class="maintext">Android App (v1.2.1)</span>
+          </div>
+        </a>
+
+        <!-- 2. iPhone / iPad PWA Web App -->
+        <a href="app/index.html" class="store-btn ios-btn">
+          <svg class="store-icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-1.99.6-2.63 1.35-.57.65-.99 1.71-.86 2.73.99.08 2.02-.51 2.57-1.23"/>
+          </svg>
+          <div class="store-text">
+            <span class="subtext">Instant iOS Web App (PWA)</span>
+            <span class="maintext">iPhone &amp; iPad App</span>
+          </div>
+        </a>
+
+        <!-- 3. Windows Desktop App -->
+        <a href="OurNest-Windows-Desktop.zip" download="OurNest-Windows-Desktop.zip" class="store-btn desktop-btn">
+          <svg class="store-icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+            <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+          </svg>
+          <div class="store-text">
+            <span class="subtext">Download PC Portable (.zip)</span>
+            <span class="maintext">Windows Desktop App</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="elderly-badge">
+        <span class="check-icon">✓</span> Elderly-friendly large text mode • Minimum 16sp font • High-contrast WCAG AA
+      </div>
+    </div>
+
+    <!-- Interactive Mockup Card -->
+    <div class="hero-mockup">
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="mockup-header">
+          <div class="mockup-header-title">
+            <span class="mockup-family-name">The Sharma Family</span>
+            <span class="mockup-e2ee-tag">🔒 End-to-End Encrypted</span>
+          </div>
+          <span class="mockup-avatar">👨</span>
+        </div>
+
+        <div class="mockup-chat-body">
+          <div class="mockup-bubble other">
+            <span class="sender-tag">Amma (Mother)</span>
+            <p>Did you eat your lunch Rahul? Remember you have tuition at 5pm.</p>
+            <span class="msg-time">1:15 PM</span>
+          </div>
+
+          <div class="mockup-bubble mine">
+            <p>Yes Amma, just finished! Can you wake me up 8am tomorrow morning?</p>
+            <span class="msg-time">1:18 PM</span>
+          </div>
+
+          <!-- Shared Alarm Card Preview -->
+          <div class="mockup-alarm-card">
+            <div class="alarm-header">
+              <span class="alarm-icon">⏰</span>
+              <div class="alarm-title-group">
+                <span class="alarm-title">Shared Alarm: 8:00 AM</span>
+                <span class="alarm-subtitle">Wake-up for Son • Escalate after 5m</span>
+              </div>
+            </div>
+            <div class="alarm-actions">
+              <span class="alarm-badge">Set on 2 devices</span>
+              <span class="alarm-status">Active ✓</span>
+            </div>
+          </div>
+
+          <div class="mockup-bubble other">
+            <span class="sender-tag">Dad (Father)</span>
+            <span class="selected-pill">🔒 To: Rahul, Amma</span>
+            <p>I booked the tickets for our weekend trip! 🎟️</p>
+            <span class="msg-time">1:22 PM</span>
+          </div>
+        </div>
+
+        <div class="mockup-input-bar">
+          <div class="mockup-audience-pill">Everyone ▾</div>
+          <div class="mockup-input-field">Message family...</div>
+          <div class="mockup-send-btn">➤</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Features Grid -->
+  <section class="features-section" id="features">
+    <div class="section-header">
+      <h2 class="section-title">Built with love for every generation.</h2>
+      <p class="section-desc">Designed to be simple enough for grandparents, yet private and powerful for everyone.</p>
+    </div>
+
+    <div class="features-grid">
+      <!-- Feature 1 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper teal-icon">
+          <span>🛡️</span>
+        </div>
+        <h3 class="feature-heading">Closed Family Circle</h3>
+        <p class="feature-text">
+          Only family members approved by your family admin can join via a private 6-character code or QR scan. No strangers, no outside spam.
+        </p>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper coral-icon">
+          <span>🔐</span>
+        </div>
+        <h3 class="feature-heading">True End-to-End Encryption</h3>
+        <p class="feature-text">
+          Powered by libsodium (X25519 &amp; XChaCha20-Poly1305). Private keys never leave your phone. The server only ever sees encrypted ciphertext.
+        </p>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper teal-icon">
+          <span>👥</span>
+        </div>
+        <h3 class="feature-heading">Everyone vs Selected</h3>
+        <p class="feature-text">
+          Talk to the entire family or select specific members with a single tap. Non-selected members never receive message keys or metadata.
+        </p>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper coral-icon">
+          <span>⏰</span>
+        </div>
+        <h3 class="feature-heading">Shared Wake-Up Alarms</h3>
+        <p class="feature-text">
+          Say "Amma, wake me up 8am" and turn it into a real local alarm on both phones with automatic escalation and a quick "Call him" button if he doesn't wake up!
+        </p>
+      </div>
+
+      <!-- Feature 5 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper teal-icon">
+          <span>🎙️</span>
+        </div>
+        <h3 class="feature-heading">Encrypted Voice &amp; Photos</h3>
+        <p class="feature-text">
+          Send quick voice notes and family photos. All media is encrypted on your device before upload to private secure storage.
+        </p>
+      </div>
+
+      <!-- Feature 6 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper coral-icon">
+          <span>👓</span>
+        </div>
+        <h3 class="feature-heading">Elderly-Friendly Accessibility</h3>
+        <p class="feature-text">
+          Minimum 16sp font, one-tap Large Text mode, 48dp+ comfortable touch targets, and high contrast compliant with WCAG AA.
+        </p>
+      </div>
+
+      <!-- Feature 7 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper teal-icon">
+          <span>📅</span>
+        </div>
+        <h3 class="feature-heading">Family Reminders &amp; Calendar</h3>
+        <p class="feature-text">
+          Schedule appointments, medication alerts, and family dinners for All or Individual members, with one-tap sync to phone calendars.
+        </p>
+      </div>
+
+      <!-- Feature 8 -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper coral-icon">
+          <span>📖</span>
+        </div>
+        <h3 class="feature-heading">Full In-App User Guide</h3>
+        <p class="feature-text">
+          Interactive visual workflows, step-by-step feature guides, and troubleshooting instructions directly inside the app for every family member.
+        </p>
+      </div>
+
+      <!-- Feature 9: Connected Family Tree, Volunteers & Broadcast Hub -->
+      <div class="feature-card" id="family-tree">
+        <div class="feature-icon-wrapper teal-icon">
+          <span>🌳</span>
+        </div>
+        <h3 class="feature-heading">3-Ring Family Tree, Volunteers &amp; Broadcasts</h3>
+        <p class="feature-text">
+          Connect <strong>🌳 Relative Families</strong>, <strong>🤝 Friend Families</strong>, and <strong>🛕⛪ Church / Temple Volunteer Groups</strong> (including single members) and send 1-tap multi-group broadcasts &amp; duty rosters!
+        </p>
+      </div>
+
+      <!-- Feature 10: Silent Curtain (Peace & Hide Mode) -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper coral-icon">
+          <span>🪟</span>
+        </div>
+        <h3 class="feature-heading">Silent Curtain (Better Than Block)</h3>
+        <p class="feature-text">
+          Had a disagreement between two families? Use <strong>Curtain Mode</strong> or a <strong>7/30-Day Peace Pause</strong> to completely hide a family branch on your side (or just your phone) with <strong>zero notification</strong> to them—and restore with 1 tap when you reconcile!
+        </p>
+      </div>
+
+      <!-- Feature 11: Rich Personal Profiles & Birthday Reminders -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper teal-icon">
+          <span>🎂</span>
+        </div>
+        <h3 class="feature-heading">Rich Profiles, Home Address &amp; Birthday Hub</h3>
+        <p class="feature-text">
+          Each family member has a complete profile card with Photo, Sex, Blood Group, Date of Birth (with automatic age &amp; birthday countdowns), Mobile Phone, WhatsApp Number, Living Place, Full Home / Residential Address (with 1-tap Google Maps navigation), Education, Occupation, Working Place &amp; Details, Status, and Bio.
+        </p>
+      </div>
+
+      <!-- Feature 12: Smart Family Composer & Live Location -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper coral-icon">
+          <span>📍</span>
+        </div>
+        <h3 class="feature-heading">Live GPS Location &amp; Smart Composer</h3>
+        <p class="feature-text">
+          Share instant or live (15m / 1h / 8h) GPS satellite coordinates with a 1-tap Google Maps button, plus a floating pill composer with quick phrases ("Reached safely ❤️", "Had food? 🍛"), 8-tile Family Action Hub, and live QR scanner.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step-by-Step Platform Installation Guide Section -->
+  <section class="features-section" id="install-guide" style="padding-top: 20px;">
+    <div class="section-header">
+      <h2 class="section-title">How to Install on Android, iPhone (iOS) &amp; Windows PC</h2>
+      <p class="section-desc">Follow these simple steps for each family member's device.</p>
+    </div>
+
+    <div class="features-grid">
+      <!-- 1. Android Installation Guide -->
+      <div class="feature-card" style="border: 2px solid rgba(31, 92, 87, 0.25);">
+        <div class="feature-icon-wrapper teal-icon">
+          <span>📱</span>
+        </div>
+        <h3 class="feature-heading">1. Android Phone &amp; Tablet (.apk)</h3>
+        <p class="feature-text" style="margin-bottom: 14px;">
+          <strong>Step 1:</strong> Tap the button below to download <code>OurNest-v1.2.1.apk</code>.<br/>
+          <strong>Step 2:</strong> Tap <strong>"Open"</strong> in your browser notification.<br/>
+          <strong>Step 3:</strong> Tap <strong>"Install"</strong> (or <strong>"Update"</strong> if upgrading—all your encrypted chats are preserved!).
+        </p>
+        <a href="ournest.apk?v=1.2.1" download="OurNest-v1.2.1.apk" class="store-btn android-btn" style="width: 100%; justify-content: center;">
+          <span class="btn-text" style="font-weight: 800;">📥 Download Android APK (v1.2.1)</span>
+        </a>
+      </div>
+
+      <!-- 2. iPhone / iPad (iOS PWA) Installation Guide -->
+      <div class="feature-card" style="border: 2px solid rgba(30, 43, 42, 0.25);">
+        <div class="feature-icon-wrapper coral-icon">
+          <span>🍎</span>
+        </div>
+        <h3 class="feature-heading">2. iPhone &amp; iPad (iOS Home Screen App)</h3>
+        <p class="feature-text" style="margin-bottom: 14px;">
+          <strong>Step 1:</strong> On your iPhone/iPad in <strong>Safari</strong>, tap the button below to open the OurNest iOS Web App.<br/>
+          <strong>Step 2:</strong> Tap the <strong>Share icon (⬆️ square with arrow)</strong> at the bottom of Safari.<br/>
+          <strong>Step 3:</strong> Scroll down and tap <strong>"Add to Home Screen" (➕)</strong>, then tap <strong>"Add"</strong> in the top-right corner!
+        </p>
+        <a href="app/index.html" class="store-btn ios-btn" style="width: 100%; justify-content: center;">
+          <span class="btn-text" style="font-weight: 800;">🍎 Open &amp; Add iPhone / iOS App</span>
+        </a>
+      </div>
+
+      <!-- 3. Windows Desktop Installation Guide -->
+      <div class="feature-card" style="border: 2px solid rgba(224, 122, 79, 0.35);">
+        <div class="feature-icon-wrapper teal-icon">
+          <span>💻</span>
+        </div>
+        <h3 class="feature-heading">3. Windows Desktop / Laptop App (.zip)</h3>
+        <p class="feature-text" style="margin-bottom: 14px;">
+          <strong>Step 1:</strong> Click below to download <code>OurNest-Windows-Desktop.zip</code>.<br/>
+          <strong>Step 2:</strong> Right-click the downloaded ZIP file and choose <strong>"Extract All..."</strong>.<br/>
+          <strong>Step 3:</strong> Open the extracted folder and double-click <strong><code>ournest.exe</code></strong> (or <a href="app/index.html" style="color: var(--primary-teal); font-weight: 800;">launch Web App in browser</a>).
+        </p>
+        <a href="OurNest-Windows-Desktop.zip" download="OurNest-Windows-Desktop.zip" class="store-btn desktop-btn" style="width: 100%; justify-content: center;">
+          <span class="btn-text" style="font-weight: 800;">💻 Download Windows Desktop (.zip)</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download & QR Code Section -->
+  <section class="download-section">
+    <div class="download-box">
+      <div class="download-text-side">
+        <h2 class="download-title">Bring your family closer today.</h2>
+        <p class="download-desc">
+          Available for Android, iPhone/iPad (iOS Web App), and Windows Desktop. Single install, infinite warmth.
+        </p>
+        <div class="download-buttons-row">
+          <a href="ournest.apk?v=1.2.1" download="OurNest-v1.2.1.apk" class="store-btn android-btn">
+            <span class="btn-text">📥 Android APK (v1.2.1)</span>
+          </a>
+          <a href="app/index.html" class="store-btn ios-btn">
+            <span class="btn-text">🍎 iPhone / iPad App (iOS)</span>
+          </a>
+          <a href="OurNest-Windows-Desktop.zip" download="OurNest-Windows-Desktop.zip" class="store-btn desktop-btn">
+            <span class="btn-text">💻 Windows Desktop (.zip)</span>
+          </a>
+        </div>
+      </div>
+      <div class="download-qr-side">
+        <div class="qr-card">
+          <svg viewBox="0 0 100 100" width="130" height="130" class="qr-code-svg">
+            <rect width="100" height="100" fill="#FFFFFF"/>
+            <!-- Corner 1 -->
+            <rect x="10" y="10" width="25" height="25" fill="#1F5C57"/>
+            <rect x="15" y="15" width="15" height="15" fill="#FFFFFF"/>
+            <rect x="18" y="18" width="9" height="9" fill="#1F5C57"/>
+            <!-- Corner 2 -->
+            <rect x="65" y="10" width="25" height="25" fill="#1F5C57"/>
+            <rect x="70" y="15" width="15" height="15" fill="#FFFFFF"/>
+            <rect x="73" y="18" width="9" height="9" fill="#1F5C57"/>
+            <!-- Corner 3 -->
+            <rect x="10" y="65" width="25" height="25" fill="#1F5C57"/>
+            <rect x="15" y="70" width="15" height="15" fill="#FFFFFF"/>
+            <rect x="18" y="73" width="9" height="9" fill="#1F5C57"/>
+            <!-- Sample Data Modules -->
+            <rect x="42" y="12" width="6" height="6" fill="#E07A4F"/>
+            <rect x="52" y="18" width="6" height="6" fill="#1F5C57"/>
+            <rect x="45" y="45" width="10" height="10" fill="#E07A4F"/>
+            <rect x="65" y="65" width="8" height="8" fill="#1F5C57"/>
+            <rect x="78" y="78" width="8" height="8" fill="#E07A4F"/>
+            <rect x="68" y="45" width="6" height="6" fill="#1F5C57"/>
+          </svg>
+          <span class="qr-label">Scan to Install on Mobile</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <span class="wordmark"><span class="our">Our</span><span class="nest">Nest</span></span>
+        <p class="footer-tagline">"Where your family talks."</p>
+      </div>
+
+      <div class="footer-legal">
+        <p class="copyright-line">
+          &copy; 2026 OurNest. All rights reserved.
+        </p>
+        <p class="developer-line">
+          Developed by <strong>ARKIS PTE LTD</strong>
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- iOS TestFlight Waitlist Modal -->
+  <div class="modal-overlay" id="iosModal" aria-hidden="true">
+    <div class="modal-card">
+      <button class="modal-close" id="modalCloseBtn" aria-label="Close modal">&times;</button>
+      <div class="modal-icon-badge">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-1.99.6-2.63 1.35-.57.65-.99 1.71-.86 2.73.99.08 2.02-.51 2.57-1.23"/>
+        </svg>
+      </div>
+      <h3 class="modal-title">OurNest for iPhone</h3>
+      <p class="modal-desc">
+        The iOS version is currently in private testing prior to public App Store release. Enter your email below to receive an early invitation via <strong>Apple TestFlight</strong>.
+      </p>
+
+      <form class="modal-form" id="iosWaitlistForm" onsubmit="handleWaitlistSubmit(event)">
+        <input 
+          type="email" 
+          id="waitlistEmail" 
+          class="modal-input" 
+          placeholder="Enter your email (e.g. name@icloud.com)" 
+          required 
+        />
+        <button type="submit" class="modal-btn">Request TestFlight Invite</button>
+      </form>
+
+      <div class="modal-success" id="modalSuccess">
+        🎉 Thank you! You've been added to the priority list. We will send your Apple TestFlight invitation link to your inbox!
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('iosModal');
+    const closeBtn = document.getElementById('modalCloseBtn');
+    const form = document.getElementById('iosWaitlistForm');
+    const successMsg = document.getElementById('modalSuccess');
+
+    // Note: .ios-btn now links directly to app/index.html (OurNest iOS PWA Web App)
+
+    function closeModal() {
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('active')) {
+        closeModal();
+      }
+    });
+
+    function handleWaitlistSubmit(e) {
+      e.preventDefault();
+      const email = document.getElementById('waitlistEmail').value;
+      if (!email) return;
+
+      try {
+        const list = JSON.parse(localStorage.getItem('ournest_ios_waitlist') || '[]');
+        list.push({ email, date: new Date().toISOString() });
+        localStorage.setItem('ournest_ios_waitlist', JSON.stringify(list));
+      } catch (err) {}
+
+      form.style.display = 'none';
+      successMsg.style.display = 'block';
+
+      setTimeout(() => {
+        closeModal();
+        setTimeout(() => {
+          form.reset();
+          form.style.display = 'flex';
+          successMsg.style.display = 'none';
+        }, 300);
+      }, 3500);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- App Icon Background -->
+  <rect width="512" height="512" rx="115" fill="#F7F4EE"/>
+
+  <!-- Left Parent (Deep Teal) -->
+  <circle cx="170" cy="195" r="58" fill="#1F5C57" />
+  <ellipse cx="170" cy="285" rx="64" ry="76" fill="#1F5C57" />
+
+  <!-- Right Parent (Deep Teal) -->
+  <circle cx="342" cy="195" r="58" fill="#1F5C57" />
+  <ellipse cx="342" cy="285" rx="64" ry="76" fill="#1F5C57" />
+
+  <!-- Center Child (Warm Coral) -->
+  <circle cx="256" cy="225" r="48" fill="#E07A4F" />
+  <ellipse cx="256" cy="305" rx="48" ry="54" fill="#E07A4F" />
+
+  <!-- Nest Bowl (Deep Teal Dark Outline) -->
+  <path d="M 72 315 C 92 455, 420 455, 440 315" fill="none" stroke="#143D39" stroke-width="40" stroke-linecap="round" />
+
+  <!-- Nest Rim (Horizontal curved line) -->
+  <path d="M 52 315 Q 256 335, 460 315" fill="none" stroke="#1F5C57" stroke-width="40" stroke-linecap="round" />
+</svg>
