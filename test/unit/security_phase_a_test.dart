@@ -138,8 +138,10 @@ void main() {
     test('alarm payload prefixes still match the scheduler', () {
       final scheduler = File('lib/core/platform/alarm_scheduler_service.dart')
           .readAsStringSync();
-      expect(scheduler, contains("payload: 'alarm_ring:"));
-      expect(scheduler, contains("payload: 'alarm_escalate:"));
+      // Must match the prefixes MainActivity.kt checks.
+      expect(scheduler, contains("ringPrefix = 'alarm_ring:'"));
+      expect(scheduler, contains("escalatePrefix = 'alarm_escalate:'"));
+      expect(scheduler, contains('payload: buildPayload('));
     });
   });
 

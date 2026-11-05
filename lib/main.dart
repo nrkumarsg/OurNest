@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/constants/env.dart';
 import 'core/network/supabase_client.dart';
+import 'core/notifications/notification_service.dart';
+import 'core/notifications/push_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +24,15 @@ void main() async {
     await SupabaseService.init();
   } catch (_) {}
 
-  // 3. Launch App inside Riverpod ProviderScope
+  try {
+    // 3. Local notifications (alarm taps, message alerts) and push (F04/F06)
+    await LocalNotifications.ensureInitialized();
+    await PushService.configureBackgroundHandling();
+  } catch (e) {
+    debugPrint('Notification setup failed: $e');
+  }
+
+  // 4. Launch App inside Riverpod ProviderScope
   runApp(
     const ProviderScope(
       child: OurNestApp(),

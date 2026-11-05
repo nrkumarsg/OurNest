@@ -53,6 +53,10 @@ dependencies:
   # Environment Config
   flutter_dotenv: ^5.1.0
 
+  # Push notifications (FCM) – only active when FIREBASE_* dart-defines are set
+  firebase_core: ^4.7.0
+  firebase_messaging: ^16.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

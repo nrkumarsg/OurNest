@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/platform/alarm_scheduler_service.dart';
 import '../../family/presentation/family_controller.dart';
 import '../domain/shared_alarm_model.dart';
 import 'alarm_controller.dart';
@@ -23,6 +25,16 @@ class AlarmRingingScreen extends ConsumerWidget {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
       }
+    }
+  }
+
+  /// Works whether the screen was pushed from chat or opened by tapping the
+  /// alarm notification on a cold start (no screen to go back to).
+  void _close(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/');
     }
   }
 
@@ -114,7 +126,7 @@ class AlarmRingingScreen extends ConsumerWidget {
                             alarmId: alarm.alarmId,
                           );
                     }
-                    if (context.mounted) Navigator.pop(context);
+                    if (context.mounted) _close(context);
                   },
                   child: Text(
                     'I\'M AWAKE ✓',
@@ -132,8 +144,16 @@ class AlarmRingingScreen extends ConsumerWidget {
                     side: const BorderSide(color: Colors.white70, width: 2),
                     minimumSize: const Size(double.infinity, 54),
                   ),
-                  onPressed: () {
-                    Navigator.pop(context);
+                  onPressed: () async {
+                    // Re-ring on this phone in 5 minutes (was a no-op before).
+                    final scheduler = ref.read(alarmSchedulerServiceProvider);
+                    await scheduler.cancelAlarm(alarm.alarmId);
+                    await scheduler.scheduleAlarm(
+                      alarm: alarm.copyWith(
+                          time: DateTime.now().add(const Duration(minutes: 5))),
+                      currentUserId: membership?.userId ?? '',
+                    );
+                    if (context.mounted) _close(context);
                   },
                   child: const Text('Snooze (5 mins)'),
                 ),
@@ -158,11 +178,30 @@ class AlarmRingingScreen extends ConsumerWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  onPressed: () => _callMember(null),
+                  onPressed: () {
+                    // Look up the alarm owner's phone (was always null before).
+                    final owner = ref
+                        .read(activeMembersProvider)
+                        .where((m) => m.userId == alarm.ownerId)
+                        .firstOrNull;
+                    final phone =
+                        owner?.profile?.phone ?? owner?.profile?.whatsappNumber;
+                    if (phone == null || phone.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('No phone number saved for this member.')));
+                      return;
+                    }
+                    _callMember(phone);
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () async {
+                    await ref
+                        .read(alarmSchedulerServiceProvider)
+                        .cancelAlarm(alarm.alarmId);
+                    if (context.mounted) _close(context);
+                  },
                   child: Text(
                     'Dismiss Alert',
                     style: GoogleFonts.nunito(color: Colors.white70, fontSize: 16),

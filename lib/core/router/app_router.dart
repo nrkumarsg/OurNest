@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/alarm/presentation/alarm_ringing_screen.dart';
 import '../../features/auth/presentation/otp_screen.dart';
 import '../../features/auth/presentation/phone_input_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -13,6 +14,7 @@ import '../../features/family/presentation/pending_approval_screen.dart';
 import '../../features/help/presentation/help_guide_screen.dart';
 import '../../features/profile/presentation/profile_setup_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../platform/alarm_scheduler_service.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -82,6 +84,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/help',
         builder: (context, state) => const HelpGuideScreen(),
+      ),
+      // Opened by tapping an alarm / escalation notification (F05).
+      GoRoute(
+        path: '/alarm',
+        builder: (context, state) {
+          final tap = state.extra as AlarmNotificationTap?;
+          if (tap == null) return const SplashScreen();
+          return AlarmRingingScreen(
+            alarm: tap.alarm,
+            isEscalation: tap.isEscalation,
+          );
+        },
       ),
     ],
   );

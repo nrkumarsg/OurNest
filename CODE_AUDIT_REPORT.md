@@ -373,4 +373,41 @@ flutter build web --release → √ Built build\web
 2. Do the two-device test above.
 3. Release the new app, then do the Phase A steps (Confirm email ON, run the password reset script).
 
-*Phase B is not committed yet. The `coverage/` folder from the first test run is safe to delete.*
+Phase B was committed on `fix/audit-phase-a` (commit `d396b2a`). Not pushed.
+
+### Phase C – Notifications & alarms (done 2026-11-05)
+
+| Finding | Status | What changed (simple words) | Files |
+|---|---|---|---|
+| F06 | ✅ Fixed (needs a phone test) | Added the three Android "receivers" the alarm plugin needs; without them scheduled alarms never fire and are lost after a reboot. The notification system is now set up once at app start. Notification IDs no longer depend on Dart's `hashCode`, which can differ between runs. The exact-alarm permission screen now only opens if the permission is actually missing. | `AndroidManifest.xml`, `lib/core/notifications/notification_service.dart`, `lib/core/platform/alarm_scheduler_service.dart`, `lib/main.dart` |
+| F05 | ✅ Fixed (needs a two-phone test) | New **alarm coordinator**. When an alarm message arrives on Amma's phone (live, by catch-up sync or by push in the background), her phone schedules the escalation alarm. When the owner taps **I'm awake**, the ack cancels it on every phone, and the owner's cancel also cancels it everywhere. | `lib/features/alarm/data/alarm_coordinator.dart` (new), `chat_repository.dart`, `alarm_controller.dart` |
+| F05 (new finding) | ✅ Fixed | The "I'm awake" screen **was never opened anywhere**, so owners couldn't confirm. Now tapping the alarm notification opens it, even when the app was closed, and the alarm card in chat has an **I'm awake** button. **Snooze** used to just close the screen; it now re-rings in 5 minutes. **Call** always called nobody; it now dials the owner's saved number. **Dismiss** now actually stops the alert. Cancel asks for confirmation; for non-owners it only silences their own phone. | `alarm_ringing_screen.dart`, `alarm_card.dart`, `lib/app.dart`, `app_router.dart` (`/alarm` route), `splash_screen.dart` |
+| F04 | ✅ Fixed in code · ⚠️ **owner setup needed** | Added Firebase Messaging. After login the app saves this phone's push token, refreshes it when it changes, and removes it on sign-out. A push in the background wakes the app briefly to catch up the chat (and schedule alarm escalations), then shows a notification with **only the sender's name**, never the message text. Firebase settings come from build options, so **without them push is simply off** and nothing crashes. | `lib/core/notifications/push_service.dart` (new), `home_chat_screen.dart`, `auth_controller.dart`, `pubspec.yaml` (`firebase_core 4.7.0`, `firebase_messaging 16.2.0`) |
+| F04 (server) | ✅ Rewritten (**not deployed, not type-checked**) | Push function moved from Google's shut-down legacy API to **FCM HTTP v1** with a service account. It only accepts calls carrying the shared secret, clears dead tokens, never reads message content and no longer returns internal error details. A new migration adds the missing database trigger, which reads the function URL and secret from Supabase Vault and never blocks sending if push fails. | `supabase/functions/push-dispatcher/index.ts`, `supabase/migrations/20261105000007_push_webhook.sql`, `supabase/manual/PUSH_SETUP.md` |
+
+**Small behaviour choices made (tell me if you want them different):**
+- While the app is open, only **alarms** show a pop-up notification. Normal messages just appear in the chat, to avoid a notification for every message you're already reading.
+- iOS escalation uses "time-sensitive" instead of "critical" alerts. Critical alerts need a special entitlement from Apple.
+- The alarm card's status label (active / acknowledged) still comes from the original alarm message. The "✓ I am awake!" message appears in the chat, but the card itself doesn't change colour yet (Phase D).
+
+**Checks after Phase C (actual results):**
+```
+flutter analyze  → 21 issues (was 27), 0 errors, 0 new warnings
+flutter test     → 00:05 +72: All tests passed!  (57 + 15 new in test/unit/alarm_push_phase_c_test.dart)
+flutter build apk --debug   → √ Built build\app\outputs\flutter-apk\app-debug.apk
+flutter build web --release → √ Built build\web
+```
+
+**Not verified yet:**
+- The Edge Function. There's no Deno on this PC, so it hasn't been type-checked or run; test it after deploy (see logs tip in `PUSH_SETUP.md`).
+- Real push delivery, background wake-up and alarm ringing on a locked phone all need real devices with Firebase configured.
+- Background sync opens the local database from a second process. If the app is open in the background at the same time, new messages appear after reopening the chat rather than instantly.
+- Web / PWA / Windows launcher: no push yet (needs web push, Phase E).
+
+### Updated owner checklist
+1. Apply migrations in order: `…000005` → `…000006` → `…000007` (staging first).
+2. Follow `supabase/manual/PUSH_SETUP.md` (Firebase project, build options, function secrets, Vault secrets).
+3. Two-phone tests: chat delivery (Phase B) plus push and shared alarm with escalation (Phase C).
+4. Release the new app, then do the Phase A steps (Confirm email ON, run the password reset script).
+
+*Phase C is not committed yet. The `coverage/` folder from the first test run is safe to delete.*

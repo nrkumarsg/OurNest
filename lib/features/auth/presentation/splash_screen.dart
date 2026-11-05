@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../app.dart' show NotificationRouting;
+import '../../../core/notifications/notification_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -53,6 +55,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           context.go('/pending-approval');
         } else {
           context.go('/home');
+          // App was opened by tapping a notification (e.g. a ringing alarm).
+          final launchPayload = LocalNotifications.takeLaunchPayload();
+          if (launchPayload != null) {
+            NotificationRouting.open(GoRouter.of(context), launchPayload);
+          }
         }
       } else {
         context.go('/phone-login');

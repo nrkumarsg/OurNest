@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/notifications/push_service.dart';
 import '../../../core/widgets/nest_logo.dart';
 import '../../family/presentation/family_controller.dart';
 import '../data/chat_repository.dart';
@@ -14,6 +15,8 @@ class HomeChatScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Registers this device for push notifications once per app run (F04).
+    ref.watch(pushRegistrationProvider);
     final familyAsync = ref.watch(currentFamilyProvider);
     final membershipAsync = ref.watch(currentMembershipProvider);
     final activeMembers = ref.watch(activeMembersProvider);

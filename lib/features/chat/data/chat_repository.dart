@@ -7,6 +7,7 @@ import '../../../core/crypto/crypto_service.dart';
 import '../../../core/crypto/device_key_manager.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/network/supabase_client.dart';
+import '../../alarm/data/alarm_coordinator.dart';
 import '../domain/chat_message_model.dart';
 import '../domain/message_payload.dart';
 
@@ -440,6 +441,16 @@ class ChatRepository {
               : const drift.Value.absent(),
         ),
       );
+
+      // Shared alarms: schedule escalation / cancel on "I'm awake" (F05).
+      try {
+        await _ref.read(alarmCoordinatorProvider).onMessageStored(
+              messageType: msgRecord['type'] as String,
+              plaintext: decryptedJson,
+            );
+      } catch (e) {
+        debugPrint('Alarm scheduling failed for ${msgRecord['id']}: $e');
+      }
       return true;
     } catch (e) {
       debugPrint('Could not decrypt message ${msgRecord['id']}: $e');

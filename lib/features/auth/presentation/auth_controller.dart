@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../../../core/crypto/device_key_manager.dart';
 import '../../../core/crypto/media_crypto_service.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/notifications/push_service.dart';
 import '../../chat/data/chat_repository.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_state.dart';
@@ -18,6 +19,10 @@ final authControllerProvider =
   return AuthController(
     repository,
     cleanupLocalSession: () async {
+      // Needs the session and device id, so it runs first.
+      try {
+        await ref.read(pushServiceProvider).unregisterCurrentDevice();
+      } catch (_) {}
       try {
         ref.read(chatRepositoryProvider).resetForSignOut();
       } catch (_) {}

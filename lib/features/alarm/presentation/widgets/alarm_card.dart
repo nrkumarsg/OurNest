@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../family/presentation/family_controller.dart';
 import '../../domain/shared_alarm_model.dart';
 import '../alarm_controller.dart';
 
@@ -15,8 +16,44 @@ class AlarmCard extends ConsumerWidget {
     required this.isMine,
   });
 
+  Future<void> _confirmCancel(
+      BuildContext context, WidgetRef ref, String familyId,
+      {required bool forEveryone}) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(forEveryone ? 'Cancel this alarm?' : 'Silence this alarm?'),
+        content: Text(forEveryone
+            ? "It will be cancelled on every family member's phone."
+            : 'It will only be silenced on this phone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Yes')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final sent = await ref
+        .read(alarmControllerProvider.notifier)
+        .cancelAlarm(familyId: familyId, alarm: alarm);
+    if (!sent && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+            'Cancelled on this phone, but could not tell the family. Check your connection.'),
+        backgroundColor: AppColors.error,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final membership = ref.watch(currentMembershipProvider).value;
+    final familyId = membership?.familyId;
+    final myUserId = membership?.userId ?? '';
     final isAck = alarm.status == AlarmStatus.acknowledged;
     final isEscalated = alarm.status == AlarmStatus.escalated;
     final isCancelled = alarm.status == AlarmStatus.cancelled;
@@ -135,11 +172,27 @@ class AlarmCard extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                // Owner can confirm "I'm awake" from the chat too, which
+                // cancels every participant's escalation alarm (F05).
+                if (alarm.isOwner(myUserId))
+                  TextButton(
+                    onPressed: familyId == null
+                        ? null
+                        : () => ref
+                            .read(alarmControllerProvider.notifier)
+                            .acknowledgeAlarm(
+                                familyId: familyId, alarmId: alarm.alarmId),
+                    child: const Text("I'm awake ✓",
+                        style: TextStyle(color: AppColors.success)),
+                  ),
                 TextButton(
-                  onPressed: () {
-                    ref.read(alarmControllerProvider.notifier).cancelAlarm(alarm.alarmId);
-                  },
-                  child: const Text('Cancel Alarm', style: TextStyle(color: AppColors.error)),
+                  onPressed: familyId == null
+                      ? null
+                      : () => _confirmCancel(context, ref, familyId,
+                          forEveryone: alarm.isOwner(myUserId)),
+                  child: Text(
+                      alarm.isOwner(myUserId) ? 'Cancel Alarm' : 'Silence on my phone',
+                      style: const TextStyle(color: AppColors.error)),
                 ),
               ],
             ),

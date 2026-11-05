@@ -67,11 +67,16 @@ class AlarmController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  /// Owner taps "I'm awake": broadcasts ack event and cancels escalation alarms
-  Future<void> acknowledgeAlarm({
+  /// Owner taps "I'm awake": stops the alarm here and broadcasts an ack so
+  /// every participant's escalation alarm is cancelled. Returns false if the
+  /// family could not be told (e.g. offline).
+  Future<bool> acknowledgeAlarm({
     required String familyId,
     required String alarmId,
   }) async {
+    // Stop ringing locally first, even if the network is down.
+    await _scheduler.cancelAlarm(alarmId);
+
     final currentUid = _ref.read(authControllerProvider).user?.id ?? '';
     final event = AlarmEventPayload(
       alarmId: alarmId,
@@ -80,21 +85,50 @@ class AlarmController extends StateNotifier<AsyncValue<void>> {
       timestamp: DateTime.now(),
     );
 
-    // Broadcast E2EE alarm_event
-    await _chatRepo.sendEncryptedMessage(
-      familyId: familyId,
-      text: '✓ I am awake!',
-      audience: MessageAudience.all,
-      type: MessageType.alarmEvent,
-      alarmMeta: event.toJson(),
-    );
-
-    // Cancel local alarms
-    await _scheduler.cancelAlarm(alarmId);
+    try {
+      await _chatRepo.sendEncryptedMessage(
+        familyId: familyId,
+        text: '✓ I am awake!',
+        audience: MessageAudience.all,
+        type: MessageType.alarmEvent,
+        alarmMeta: event.toJson(),
+      );
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
   }
 
-  /// Cancels the alarm for everyone
-  Future<void> cancelAlarm(String alarmId) async {
-    await _scheduler.cancelAlarm(alarmId);
+  /// Cancels the alarm. The owner's cancel is broadcast so every participant's
+  /// escalation is cancelled too; anyone else only silences it on this phone.
+  Future<bool> cancelAlarm({
+    required String familyId,
+    required SharedAlarm alarm,
+  }) async {
+    await _scheduler.cancelAlarm(alarm.alarmId);
+
+    final currentUid = _ref.read(authControllerProvider).user?.id ?? '';
+    if (!alarm.isOwner(currentUid)) return true;
+
+    try {
+      final event = AlarmEventPayload(
+        alarmId: alarm.alarmId,
+        eventType: AlarmEventType.cancel,
+        senderId: currentUid,
+        timestamp: DateTime.now(),
+      );
+      await _chatRepo.sendEncryptedMessage(
+        familyId: familyId,
+        text: '🔕 Alarm cancelled: ${alarm.label}',
+        audience: MessageAudience.all,
+        type: MessageType.alarmEvent,
+        alarmMeta: event.toJson(),
+      );
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
   }
 }
