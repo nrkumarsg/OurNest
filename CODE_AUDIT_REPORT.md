@@ -258,6 +258,13 @@ ANY – Settings
 - **Q9.** Are you OK with forcing all existing users to log in again by email OTP after the F01 fix (their passwords will be reset)?
 - **Q10.** Do you have, or want, a separate **staging Supabase project** so testing never touches real family data?
 
+**Decisions (2026-11-05, owner asked for Claude's recommendation on Q1/Q2/Q4):**
+- **Q1 → one family per person, for now.** The server refuses joining a second family with a clear message; an older pending request elsewhere is replaced. Relatives stay connected through "Connected Nests". A family switcher can come later. *(implemented in migration `…000009`)*
+- **Q2 → not now.** Real cross-family delivery means sharing keys and data between families, a large privacy and security change. The honest "posts to your own chat" wording from Phase D stays. Revisit after chat, push and alarms are proven on real phones.
+- **Q4 → no.** While other active members remain, the last admin must make someone else admin before leaving. A lone admin may leave. Deleting the whole family or an account isn't blocked. *(implemented in migration `…000009`)*
+- **Q5 → keep the sponsored card** (owner's decision). It's static: no tracking, no network calls.
+- Still open: Q3, Q6 (partly done: admins can now issue a new code), Q7, Q8, Q9, Q10.
+
 ---
 
 ## 8. Prioritised fix plan
@@ -454,4 +461,53 @@ flutter build web --release → √ Built build\web
 4. Release the new app, then do the Phase A steps (Confirm email ON, run the password reset script).
 5. Answer **Q1, Q2, Q4, Q5** so the remaining Phase D items can be finished.
 
-*Phase D is not committed yet. The `coverage/` folder from the first test run is safe to delete.*
+Phase D was committed on `fix/audit-phase-a` (commit `e728676`). Not pushed.
+
+### Phase E – Release readiness (done 2026-11-05)
+
+| Finding | Status | What changed (simple words) | Files |
+|---|---|---|---|
+| F14 | ✅ Fixed | Release builds no longer use the public debug key without telling you. They now use **your own key** from `android/key.properties` (git-ignored). Without it, a release build **stops with a clear message**. For a local test only: `flutter build apk --release --android-project-arg=ournest.allowDebugSigning=true` (prints a warning; never publish that APK). | `android/app/build.gradle` |
+| F27 | ✅ Fixed | iPhone now explains why location is needed, so the native iOS app won't crash or be rejected when sharing location. | `ios/Runner/Info.plist` |
+| F26 | ✅ Fixed | **Sign-in guard:** signed-out users can only see the splash and login screens, and after sign-out the app returns to login automatically. **Invite links** (`ournest://invite/CODE`, `…/join?code=CODE`) open the Join screen with the code filled in; if you weren't signed in, it continues there after sign-in. The email sign-in link no longer lands on an unknown page. Unknown links show a friendly "page not found" with a Home button instead of a red error. | `lib/core/router/route_guard.dart` (new), `app_router.dart`, `AndroidManifest.xml` (`flutter_deeplinking_enabled`) |
+| F28 / F33 | ✅ Fixed | `.env` is **no longer bundled** into the web app, the Windows zip or the APK (confirmed: `build/web/assets` has no `.env`). Settings now come from build options (`--dart-define` / `--dart-define-from-file=env/staging.json`; template in `env/staging.example.json`, real files git-ignored). With no options, the same public production values as before are used, so nothing changes for current builds. Removed the `flutter_dotenv` package. | `lib/core/constants/env.dart`, `pubspec.yaml`, `env/`, `.gitignore`, `main.dart` |
+| F28 (desktop) | ✅ Fixed | The Windows launcher no longer opens `http://192.168.18.19:8080` (a private machine on the developer's network). Without Python it now explains how to install the web app from Edge or Chrome. | `landing/Start-OurNest-Desktop.bat` |
+| F41 | ✅ Fixed | Removed the empty `assets/images/` entry that could break fresh builds. | `pubspec.yaml` |
+| F20 | ✅ Fixed (migration, not applied) | At most **10 wrong invite codes per hour** per account. The failed attempt is saved before replying, so the limit really counts. The admin gets **"Create a new invite code"** (with confirmation) to stop a leaked code or QR from working. | `supabase/migrations/20261105000009_invites_membership_realtime.sql`, `family_repository.dart`, `family_controller.dart`, `family_qr_scanner_modal.dart` |
+| F21 | ✅ Fixed (needs a server setting) | The family chat's live channel (online status, ticks) is now **private**: only active members of that family may join. If the server isn't ready yet, the app falls back to the old public channel once, so chat keeps working during the rollout. | same migration, `chat_repository.dart` |
+| Q1 / Q4 | ✅ Implemented as decided | One family per person; the last admin must hand over before leaving. The app shows the reason, e.g. "You are the only admin. Make another member admin before leaving the family." Before, leaving failed silently and still jumped to the "join a family" screen. | same migration, `family_screen.dart` |
+| (new) | ✅ Fixed | Errors were shown as raw text such as "Bad state: …" or "PostgrestException(…)". There's now one helper that turns them into plain sentences. Removing a member and leaving also report the real result. | `lib/core/errors/friendly_error.dart` (new), `join_family_screen.dart`, `family_screen.dart` |
+
+**Also fixed while testing:** a test caught that `/family` (6 letters) could be mistaken for an invite code. Bare-code links now only match the real invite alphabet (uppercase, no 0/O/1/I).
+
+**Checks after Phase E (actual results):**
+```
+flutter analyze  → 16 issues, 0 errors, 0 new
+flutter test     → 00:10 +110: All tests passed!  (87 + 23 new in test/unit/release_phase_e_test.dart)
+flutter build apk --debug   → √ Built build\app\outputs\flutter-apk\app-debug.apk
+flutter build apk --release (no key) → FAILURE: "Release signing key missing: create android/key.properties …"  ← intended
+flutter build apk --release --android-project-arg=ournest.allowDebugSigning=true → √ Built app-release.apk (86.6MB)
+flutter build web --release → √ Built build\web   (no .env in build/web/assets)
+```
+
+**Not verified yet / needs you:**
+- **Signing key change.** Phones that installed the old debug-signed APK **can't update** to an APK signed with your new key; Android requires uninstall and reinstall. Do this once, now, while there are few users. Create the key with:
+  ```bash
+  keytool -genkey -v -keystore C:/keys/ournest-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias ournest
+  ```
+  Then create `android/key.properties` (format in `build.gradle`). **Back up the .jks file and passwords.** If you lose them, you can never update the app again.
+- **Old `.env` copies:** `landing/app/assets/.env` and `landing/OurNest-Windows-Desktop.zip` still contain the old bundled `.env` (public values only). They disappear when you rebuild the landing app and zip. I didn't delete them.
+- **F21:** after applying migration `…000009`, go to Supabase → Realtime → Settings and turn **off "Allow public access"**; only then are private channels enforced.
+- **Deep links:** test on an Android phone by scanning a family QR with the camera app. iOS can't open `ournest://` links yet, because the URL scheme isn't registered in `Info.plist`; that's only needed if you ship native iOS.
+- **Join limit:** test on staging: 10 wrong codes, then the 11th should show "Too many wrong invite codes…".
+
+### Updated owner checklist
+1. Apply migrations in order: `…000005` → `…000006` → `…000007` → `…000008` → `…000009` (staging first).
+2. Supabase → Realtime → Settings → turn off "Allow public access" (after step 1).
+3. Create the release key and `android/key.properties`; back them up.
+4. `supabase/manual/PUSH_SETUP.md` for push.
+5. Rebuild `landing/app` (web) and the Windows zip, so the old bundled `.env` disappears.
+6. Two-phone tests: chat, push, shared alarm, invite link and QR, link request and approval, admin-leave rule.
+7. Release the new app (users with the old APK must reinstall once because of the new key), then do the Phase A steps (Confirm email ON, run the password reset script).
+
+*Phase E is not committed yet. The `coverage/` folder from the first test run is safe to delete.*

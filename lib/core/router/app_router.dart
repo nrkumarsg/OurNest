@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/alarm/presentation/alarm_ringing_screen.dart';
+import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/otp_screen.dart';
 import '../../features/auth/presentation/phone_input_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -15,10 +17,24 @@ import '../../features/help/presentation/help_guide_screen.dart';
 import '../../features/profile/presentation/profile_setup_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../platform/alarm_scheduler_service.dart';
+import 'route_guard.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  // Re-run the redirect whenever the user signs in or out (F26).
+  final authChanges = ValueNotifier<int>(0);
+  ref.listen(authControllerProvider, (prev, next) {
+    if (prev?.user?.id != next.user?.id) authChanges.value++;
+  });
+  ref.onDispose(authChanges.dispose);
+
   return GoRouter(
     initialLocation: '/',
+    refreshListenable: authChanges,
+    redirect: (context, state) => RouteGuard.redirect(
+      state.uri,
+      loggedIn: ref.read(authControllerProvider).user != null,
+    ),
+    errorBuilder: (context, state) => const _NotFoundScreen(),
     routes: [
       GoRoute(
         path: '/',
@@ -100,3 +116,39 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// Friendly page for unknown links instead of GoRouter's red error screen.
+class _NotFoundScreen extends StatelessWidget {
+  const _NotFoundScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.travel_explore_rounded, size: 56),
+                const SizedBox(height: 16),
+                Text('This page could not be found',
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                const Text('The link may be old or incomplete.',
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => context.go('/'),
+                  child: const Text('Go to OurNest home'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

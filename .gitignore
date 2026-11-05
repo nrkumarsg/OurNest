@@ -83,3 +83,7 @@ undecorated_symbol_map.json
 .env
 .env.*
 !.env.example
+
+# Build-time config files (copy env/*.example.json)
+env/*.json
+!env/*.example.json

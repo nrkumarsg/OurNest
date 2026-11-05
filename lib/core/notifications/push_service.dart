@@ -7,7 +7,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/chat/data/chat_repository.dart';
-import '../constants/env.dart';
 import '../crypto/device_key_manager.dart';
 import '../network/supabase_client.dart';
 import '../platform/alarm_scheduler_service.dart';
@@ -115,7 +114,6 @@ Future<void> firebaseBackgroundMessageHandler(RemoteMessage message) async {
   final familyId = message.data['family_id'] as String?;
   final container = ProviderContainer();
   try {
-    await Env.init();
     await SupabaseService.init();
     final signedIn = Supabase.instance.client.auth.currentUser != null;
     if (signedIn && familyId != null) {

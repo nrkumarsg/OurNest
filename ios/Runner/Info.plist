@@ -44,6 +44,8 @@
 	<string>OurNest needs photo library access to share pictures with your family.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>OurNest needs microphone access to send encrypted voice messages to your family.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>OurNest uses your location only when you choose to share it with your family in a chat.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

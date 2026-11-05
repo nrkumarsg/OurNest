@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' hide Family;
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import '../../../core/constants/app_colors.dart';
+import '../../../core/errors/friendly_error.dart';
 import '../../chat/domain/chat_message_model.dart';
 import '../../chat/presentation/chat_controller.dart';
 import '../../profile/presentation/widgets/member_profile_sheet.dart';
@@ -25,17 +25,8 @@ void showFamilyActionResult(
   required String success,
 }) {
   if (!context.mounted) return;
-  final err = ref.read(familyControllerProvider).error;
-  final String message;
-  if (ok) {
-    message = success;
-  } else if (err is StateError) {
-    message = err.message;
-  } else if (err is PostgrestException) {
-    message = err.message;
-  } else {
-    message = 'Something went wrong. Please check your connection and try again.';
-  }
+  final message =
+      ok ? success : friendlyError(ref.read(familyControllerProvider).error);
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
     content: Text(message),
     backgroundColor: ok ? AppColors.success : AppColors.error,
@@ -84,6 +75,17 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
         builder: (_) => FamilyQrScannerModal(
           family: family,
           initialTabIndex: initialTab,
+          onResetInviteCode: (ref.read(currentMembershipProvider).value?.isAdmin ?? false)
+              ? () async {
+                  final code = await ref
+                      .read(familyControllerProvider.notifier)
+                      .regenerateInviteCode(family.id);
+                  if (code == null && context.mounted) {
+                    showFamilyActionResult(context, ref, ok: false, success: '');
+                  }
+                  return code;
+                }
+              : null,
         ),
       ),
     );
@@ -250,13 +252,17 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
               child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
-              await ref
+              final ok = await ref
                   .read(familyControllerProvider.notifier)
                   .removeMember(
                     familyId: member.familyId,
                     targetUserId: member.userId,
                   );
               if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) {
+                showFamilyActionResult(context, ref,
+                    ok: ok, success: '${member.displayName} was removed.');
+              }
             },
             child: const Text('Remove',
                 style: TextStyle(color: AppColors.error)),
@@ -280,12 +286,16 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
               child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
-              await ref
+              final ok = await ref
                   .read(familyControllerProvider.notifier)
                   .leaveFamily(familyId);
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (!context.mounted) return;
+              if (ok) {
                 context.go('/family-entry');
+              } else {
+                // e.g. Q4: the only admin must hand over the role first.
+                showFamilyActionResult(context, ref, ok: false, success: '');
               }
             },
             child: const Text('Leave',

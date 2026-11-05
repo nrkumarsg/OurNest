@@ -48,7 +48,21 @@ class FamilyRepository {
         'applicant_relation_label': applicantRelationLabel,
       },
     );
-    return Map<String, dynamic>.from(response as Map);
+    final map = Map<String, dynamic>.from(response as Map);
+    // The server returns {error: ...} for a wrong code so the attempt limit
+    // can count it (F20).
+    final error = map['error'];
+    if (error is String && error.isNotEmpty) throw StateError(error);
+    return map;
+  }
+
+  /// Admin: replaces the family's invite code; old codes / QR stop working.
+  Future<String> regenerateInviteCode(String familyId) async {
+    final res = await _client.rpc(
+      'regenerate_invite_code',
+      params: {'target_family_id': familyId},
+    );
+    return res as String;
   }
 
   /// Fetches the user's current family membership (including pending).
@@ -151,13 +165,15 @@ class FamilyRepository {
     required String familyId,
     required String targetUserId,
   }) async {
-    await _client
+    final rows = await _client
         .from('family_members')
         .delete()
         .match({
           'family_id': familyId,
           'user_id': targetUserId,
-        });
+        })
+        .select('user_id');
+    expectChanged(rows, 'Only the family admin can remove members.');
   }
 
   /// Member: Leaves the family
@@ -165,13 +181,15 @@ class FamilyRepository {
     final uid = currentUserId;
     if (uid == null) return;
 
-    await _client
+    final rows = await _client
         .from('family_members')
         .delete()
         .match({
           'family_id': familyId,
           'user_id': uid,
-        });
+        })
+        .select('user_id');
+    expectChanged(rows, 'You are not a member of this family.');
   }
 
   /// Admin: Renames the family

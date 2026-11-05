@@ -34,6 +34,11 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
+            <!-- Pass ournest:// links to the app router (F26: invite links
+                 previously just opened the app on whatever screen it was on). -->
+            <meta-data
+              android:name="flutter_deeplinking_enabled"
+              android:value="true" />
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"

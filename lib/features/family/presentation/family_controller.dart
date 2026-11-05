@@ -200,6 +200,20 @@ class FamilyController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// Admin: issues a new invite code (F20). Returns the new code, or null.
+  Future<String?> regenerateInviteCode(String familyId) async {
+    state = const AsyncValue.loading();
+    try {
+      final code = await _repository.regenerateInviteCode(familyId);
+      state = const AsyncValue.data(null);
+      _invalidateAll();
+      return code;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return null;
+    }
+  }
+
   Future<bool> renameFamily({
     required String familyId,
     required String newName,

@@ -99,11 +99,16 @@ class FamilyQrScannerModal extends StatefulWidget {
   final int initialTabIndex;
   final ValueChanged<ParsedFamilyInvite>? onInviteScanned;
 
+  /// Admin only: replaces the invite code (F20). Returns the new code, or
+  /// null if it failed (the caller shows the error).
+  final Future<String?> Function()? onResetInviteCode;
+
   const FamilyQrScannerModal({
     super.key,
     this.family,
     this.initialTabIndex = 0,
     this.onInviteScanned,
+    this.onResetInviteCode,
   });
 
   @override
@@ -120,6 +125,44 @@ class _FamilyQrScannerModalState extends State<FamilyQrScannerModal>
   );
   bool _hasScanned = false;
   bool _torchOn = false;
+  late Family? _family = widget.family;
+  bool _resetting = false;
+
+  Future<void> _resetInviteCode() async {
+    final reset = widget.onResetInviteCode;
+    final family = _family;
+    if (reset == null || family == null || _resetting) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Create a new invite code?'),
+        content: const Text(
+            "The current code and QR will stop working. Use this if the code was shared with someone it shouldn't have been."),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep current code')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Create new code')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _resetting = true);
+    final newCode = await reset();
+    if (!mounted) return;
+    setState(() {
+      _resetting = false;
+      if (newCode != null) _family = family.copyWith(inviteCode: newCode);
+    });
+    if (newCode != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('New invite code: $newCode. The old one no longer works.'),
+        backgroundColor: AppColors.primaryTeal,
+      ));
+    }
+  }
 
   @override
   void initState() {
@@ -240,7 +283,7 @@ class _FamilyQrScannerModalState extends State<FamilyQrScannerModal>
           ? TabBarView(
               controller: _tabController,
               children: [
-                _buildMyFamilyQrTab(widget.family!),
+                _buildMyFamilyQrTab(_family!),
                 _buildScannerTab(),
               ],
             )
@@ -427,6 +470,19 @@ class _FamilyQrScannerModalState extends State<FamilyQrScannerModal>
               _tabController.animateTo(1);
             },
           ),
+          if (widget.onResetInviteCode != null) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              icon: _resetting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.autorenew_rounded),
+              label: const Text('Create a new invite code'),
+              onPressed: _resetting ? null : _resetInviteCode,
+            ),
+          ],
         ],
       ),
     );

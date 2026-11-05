@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/errors/friendly_error.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -100,7 +101,8 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
       final error = ref.read(familyControllerProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error?.toString() ?? 'Failed to join family. Check code.'),
+          content: Text(friendlyError(error,
+              fallback: 'Failed to join family. Check the code and try again.')),
           backgroundColor: AppColors.error,
         ),
       );

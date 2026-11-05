@@ -225,7 +225,12 @@ class ChatRepository {
   /// Listens to Realtime messages, tracks Online/Offline Presence, and handles
   /// Single/Double/Read Ticks. Every (re)connect also runs a catch-up sync so
   /// messages sent while this device was offline are fetched (F02).
-  void startRealtimeSync(String familyId) {
+  ///
+  /// The channel is PRIVATE (F21): the server only lets active members of
+  /// this family join (policy in migration 20261105000009). If the server
+  /// isn't set up for private channels yet, it falls back to a public channel
+  /// once, so chat keeps working during the rollout.
+  void startRealtimeSync(String familyId, {bool private = true}) {
     if (_subscription != null && _subscribedFamilyId == familyId) {
       // Already listening (e.g. user opened another thread): just catch up.
       unawaited(_safeSync(familyId));
@@ -234,7 +239,10 @@ class ChatRepository {
     _subscription?.unsubscribe();
     _subscribedFamilyId = familyId;
 
-    final channel = _client.channel('family_chat_$familyId');
+    final channel = _client.channel(
+      'family_chat_$familyId',
+      opts: RealtimeChannelConfig(private: private),
+    );
 
     channel
         .onPostgresChanges(
@@ -299,6 +307,16 @@ class ChatRepository {
           },
         )
         .subscribe((status, [error]) async {
+          if (status == RealtimeSubscribeStatus.channelError &&
+              private &&
+              identical(_subscription, channel)) {
+            debugPrint('Private realtime channel refused ($error); '
+                'falling back to public channel. Apply migration 20261105000009.');
+            channel.unsubscribe();
+            _subscription = null;
+            startRealtimeSync(familyId, private: false);
+            return;
+          }
           if (status == RealtimeSubscribeStatus.subscribed &&
               currentUserId != null) {
             try {
