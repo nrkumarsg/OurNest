@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../family/presentation/family_controller.dart';
 import '../../domain/shared_alarm_model.dart';
 import '../alarm_controller.dart';
+import '../alarm_status_provider.dart';
 
 class AlarmCard extends ConsumerWidget {
   final SharedAlarm alarm;
@@ -54,9 +55,12 @@ class AlarmCard extends ConsumerWidget {
     final membership = ref.watch(currentMembershipProvider).value;
     final familyId = membership?.familyId;
     final myUserId = membership?.userId ?? '';
-    final isAck = alarm.status == AlarmStatus.acknowledged;
-    final isEscalated = alarm.status == AlarmStatus.escalated;
-    final isCancelled = alarm.status == AlarmStatus.cancelled;
+    // Status follows later "I'm awake" / cancel events in the chat.
+    final status =
+        ref.watch(alarmStatusOverridesProvider)[alarm.alarmId] ?? alarm.status;
+    final isAck = status == AlarmStatus.acknowledged;
+    final isEscalated = status == AlarmStatus.escalated;
+    final isCancelled = status == AlarmStatus.cancelled;
 
     Color cardBorderColor = AppColors.accentCoral;
     Color statusBadgeColor = AppColors.accentCoral.withOpacity(0.15);

@@ -5,10 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_version.dart';
+import '../../../core/platform/alarm_scheduler_service.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../auth/presentation/auth_controller.dart';
-import '../../family/presentation/family_controller.dart';
 import '../../profile/presentation/profile_controller.dart';
+
+/// Real alarm/notification permission state (was always shown as "ready").
+final alarmPermissionStatusProvider = FutureProvider.autoDispose<bool?>((ref) {
+  return ref.read(alarmSchedulerServiceProvider).alarmPermissionsGranted();
+});
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -203,12 +209,35 @@ class SettingsScreen extends ConsumerWidget {
                     trailing: const Icon(Icons.check_circle_rounded, color: AppColors.success),
                   ),
                   const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.alarm_rounded, color: AppColors.accentCoral),
-                    title: const Text('Alarm & Reminders Permission'),
-                    subtitle: const Text('Exact alarms ready for shared wake-up'),
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                  ),
+                  Builder(builder: (context) {
+                    final permission = ref.watch(alarmPermissionStatusProvider);
+                    final granted = permission.value;
+                    final subtitle = permission.isLoading
+                        ? 'Checking…'
+                        : granted == null
+                            ? 'Alarms ring only in the Android / iPhone app'
+                            : granted
+                                ? 'Allowed – shared wake-up alarms can ring'
+                                : 'Not allowed – tap to allow, or alarms may not ring';
+                    return ListTile(
+                      leading: const Icon(Icons.alarm_rounded, color: AppColors.accentCoral),
+                      title: const Text('Alarm & Reminders Permission'),
+                      subtitle: Text(subtitle),
+                      trailing: granted == true
+                          ? const Icon(Icons.check_circle_rounded, color: AppColors.success)
+                          : granted == false
+                              ? const Icon(Icons.warning_amber_rounded, color: AppColors.error)
+                              : null,
+                      onTap: granted == false
+                          ? () async {
+                              await ref
+                                  .read(alarmSchedulerServiceProvider)
+                                  .requestAlarmPermissions();
+                              ref.invalidate(alarmPermissionStatusProvider);
+                            }
+                          : null,
+                    );
+                  }),
                 ],
               ),
             ),
@@ -237,12 +266,13 @@ class SettingsScreen extends ConsumerWidget {
                   ListTile(
                     leading: const Icon(Icons.info_outline_rounded, color: AppColors.accentCoral),
                     title: const Text('About OurNest'),
-                    subtitle: const Text('v1.2.1 (Build 4) • Developed by ARKIS PTE LTD'),
+                    subtitle: const Text(
+                        'v$appVersionLabel • Developed by ARKIS PTE LTD'),
                     onTap: () {
                       showAboutDialog(
                         context: context,
                         applicationName: 'OurNest',
-                        applicationVersion: '1.2.1 (Build 4)',
+                        applicationVersion: appVersionLabel,
                         applicationLegalese:
                             '© 2026 OurNest. All rights reserved.\nDeveloped by ARKIS PTE LTD.',
                         children: const [

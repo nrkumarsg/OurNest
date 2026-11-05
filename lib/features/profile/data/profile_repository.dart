@@ -25,8 +25,12 @@ class ProfileRepository {
     return Profile.fromJson(response);
   }
 
-  /// Inserts or updates a user profile with automatic fallback if extended columns
-  /// are not yet migrated on the remote database or if `phone` unique constraint collides.
+  /// Inserts or updates the user's profile.
+  ///
+  /// Audit F10: this used to try three fallbacks and, if all failed, return
+  /// the unsaved profile as if it had been saved. It also silently dropped the
+  /// phone number when it clashed with another account. Now it either saves
+  /// everything or throws a clear error.
   Future<Profile> upsertProfile(Profile profile) async {
     try {
       final response = await _client
@@ -34,30 +38,23 @@ class ProfileRepository {
           .upsert(profile.toJson())
           .select()
           .single();
-
       return Profile.fromJson(response);
-    } catch (_) {
-      try {
-        final fallbackResponse = await _client
-            .from('profiles')
-            .upsert(profile.toFallbackCoreJson(includePhoneColumn: true))
-            .select()
-            .single();
-
-        return Profile.fromJson(fallbackResponse);
-      } catch (_) {
-        try {
-          final safePhoneFallback = await _client
-              .from('profiles')
-              .upsert(profile.toFallbackCoreJson(includePhoneColumn: false))
-              .select()
-              .single();
-
-          return Profile.fromJson(safePhoneFallback);
-        } catch (_) {
-          return profile;
-        }
-      }
+    } on PostgrestException catch (e) {
+      throw StateError(friendlyProfileError(e.code, e.message));
     }
+  }
+
+  /// Turns database errors into words a family member understands.
+  static String friendlyProfileError(String? code, String message) {
+    if (code == '23505' && message.contains('phone')) {
+      return 'This phone number is already used by another OurNest account.';
+    }
+    if (code == '23514') {
+      return 'One of the details has an invalid value. Please check and try again.';
+    }
+    if (code == '42501') {
+      return 'You are not allowed to change this profile.';
+    }
+    return 'Could not save your profile. Please check your connection and try again.';
   }
 }

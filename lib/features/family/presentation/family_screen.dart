@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' hide Family;
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import '../../../core/constants/app_colors.dart';
 import '../../chat/domain/chat_message_model.dart';
 import '../../chat/presentation/chat_controller.dart';
@@ -14,6 +15,32 @@ import '../domain/family_model.dart';
 import '../domain/relation_type.dart';
 import 'family_controller.dart';
 import 'widgets/family_qr_scanner_modal.dart';
+
+/// Shows the real outcome of a family action (audit F07/U19): success only
+/// when the server actually saved it, otherwise the reason it failed.
+void showFamilyActionResult(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool ok,
+  required String success,
+}) {
+  if (!context.mounted) return;
+  final err = ref.read(familyControllerProvider).error;
+  final String message;
+  if (ok) {
+    message = success;
+  } else if (err is StateError) {
+    message = err.message;
+  } else if (err is PostgrestException) {
+    message = err.message;
+  } else {
+    message = 'Something went wrong. Please check your connection and try again.';
+  }
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(message),
+    backgroundColor: ok ? AppColors.success : AppColors.error,
+  ));
+}
 
 class FamilyScreen extends ConsumerStatefulWidget {
   const FamilyScreen({super.key});
@@ -618,15 +645,13 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                             messagingPolicy: selectedPolicy,
                           );
                       if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              ok
-                                  ? '🌳 Linked $selectedBranch ($code) into your Family Tree!'
-                                  : 'Could not link family. Please verify code.',
-                            ),
-                          ),
+                        if (ok) Navigator.pop(ctx);
+                        showFamilyActionResult(
+                          context,
+                          ref,
+                          ok: ok,
+                          success:
+                              '🌳 Request sent. It will show as connected once their admin approves it.',
                         );
                       }
                     },
@@ -1024,7 +1049,7 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                       final formatted =
                           '📢 [Multi-Group Broadcast → $targetLabel ($scopeLabel)]\n$text';
 
-                      await ref
+                      final ok = await ref
                           .read(chatControllerProvider.notifier)
                           .sendMessage(
                             familyId: myFamily.id,
@@ -1033,15 +1058,19 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                           );
 
                       if (ctx.mounted) {
-                        Navigator.pop(ctx);
+                        if (ok) Navigator.pop(ctx);
+                        // Honest wording (F08): connected families do NOT
+                        // receive this yet – it is posted in our own chat.
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
-                                '📢 Broadcast delivered to $targetLabel!'),
-                            backgroundColor: AppColors.success,
+                            content: Text(ok
+                                ? '📢 Posted in your family chat. Connected families don\'t receive broadcasts yet.'
+                                : 'Not sent. Check your connection and try again.'),
+                            backgroundColor:
+                                ok ? AppColors.success : AppColors.error,
                           ),
                         );
-                        context.push('/chat/family');
+                        if (ok) context.push('/chat/family');
                       }
                     },
                   ),
@@ -1268,7 +1297,7 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                       foregroundColor: Colors.white,
                     ),
                     icon: const Icon(Icons.send_rounded),
-                    label: const Text('Send Across Family Tree'),
+                    label: const Text('Post to Our Family Chat'),
                     onPressed: () async {
                       final body = msgCtrl.text.trim();
                       if (body.isEmpty) return;
@@ -1282,7 +1311,7 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                       final formattedCrossMessage =
                           '🌳 [Family-to-Family • ${link.branchLabel} → $targetBadge]\n$body';
 
-                      await ref
+                      final ok = await ref
                           .read(chatControllerProvider.notifier)
                           .sendMessage(
                             familyId: myFamily.id,
@@ -1291,8 +1320,17 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                           );
 
                       if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                        context.push('/chat/family');
+                        if (ok) Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok
+                                ? 'Posted in your family chat. ${link.connectedFamilyName} doesn\'t receive it yet.'
+                                : 'Not sent. Check your connection and try again.'),
+                            backgroundColor:
+                                ok ? AppColors.success : AppColors.error,
+                          ),
+                        );
+                        if (ok) context.push('/chat/family');
                       }
                     },
                   ),
@@ -1569,11 +1607,33 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                               foregroundColor: AppColors.error),
                           icon: const Icon(Icons.link_off_rounded, size: 18),
                           label: const Text('Unlink Permanently'),
-                          onPressed: () {
-                            ref
+                          onPressed: () async {
+                            final confirmed = await showDialog<bool>(
+                              context: ctx,
+                              builder: (dCtx) => AlertDialog(
+                                title: const Text('Unlink this family?'),
+                                content: Text(
+                                    '${link.connectedFamilyName} will be removed from your Family Tree. You would need a new request to connect again.'),
+                                actions: [
+                                  TextButton(
+                                      onPressed: () => Navigator.pop(dCtx, false),
+                                      child: const Text('Keep')),
+                                  TextButton(
+                                      onPressed: () => Navigator.pop(dCtx, true),
+                                      child: const Text('Unlink',
+                                          style: TextStyle(color: AppColors.error))),
+                                ],
+                              ),
+                            );
+                            if (confirmed != true) return;
+                            final ok = await ref
                                 .read(familyControllerProvider.notifier)
                                 .removeFamilyLink(link.id);
-                            Navigator.pop(ctx);
+                            if (ctx.mounted && ok) Navigator.pop(ctx);
+                            if (context.mounted) {
+                              showFamilyActionResult(context, ref,
+                                  ok: ok, success: 'Family unlinked.');
+                            }
                           },
                         ),
                       const Spacer(),
@@ -1585,7 +1645,7 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                                   pauseDays > 0)
                               ? DateTime.now().add(Duration(days: pauseDays))
                               : null;
-                          await ref
+                          final ok = await ref
                               .read(familyControllerProvider.notifier)
                               .updateFamilyPeaceMode(
                                 linkId: link.id,
@@ -1596,18 +1656,17 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                                 hideOurUpdates: hideUpdates,
                                 pausedUntil: until,
                               );
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  selectedMode == 'curtain_hidden'
-                                      ? '🪟 ${link.connectedFamilyName} is now tucked behind the Silent Curtain.'
-                                      : selectedMode == 'peace_pause'
-                                          ? '🕊️ Peace Pause activated for ${link.connectedFamilyName}.'
-                                          : '🌳 Restored normal visibility for ${link.connectedFamilyName}.',
-                                ),
-                              ),
+                          if (ctx.mounted && ok) Navigator.pop(ctx);
+                          if (context.mounted) {
+                            showFamilyActionResult(
+                              context,
+                              ref,
+                              ok: ok,
+                              success: selectedMode == 'curtain_hidden'
+                                  ? '🪟 ${link.connectedFamilyName} is now tucked behind the Silent Curtain.'
+                                  : selectedMode == 'peace_pause'
+                                      ? '🕊️ Peace Pause activated for ${link.connectedFamilyName}.'
+                                      : '🌳 Restored normal visibility for ${link.connectedFamilyName}.',
                             );
                           }
                         },
@@ -2537,7 +2596,7 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                                       ],
                                     ),
                                     Text(
-                                      '${link.isFriendFamily ? "🤝 Friend Circle" : "🌿 Family Tree"} • ${link.branchLabel} • Code: ${link.connectedInviteCode}',
+                                      '${link.isFriendFamily ? "🤝 Friend Circle" : "🌿 Family Tree"} • ${link.branchLabel}',
                                       style: GoogleFonts.nunito(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w700,
@@ -2616,15 +2675,22 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                               ),
                               if (isAdmin)
                                 TextButton(
-                                  onPressed: () {
+                                  onPressed: () async {
                                     final nextPolicy = link.adminsOnly
                                         ? 'all_members'
                                         : 'admins_only';
-                                    ref
+                                    final ok = await ref
                                         .read(
                                             familyControllerProvider.notifier)
                                         .updateFamilyLinkPolicy(
                                             link.id, nextPolicy);
+                                    if (context.mounted) {
+                                      showFamilyActionResult(context, ref,
+                                          ok: ok,
+                                          success: nextPolicy == 'admins_only'
+                                              ? 'Only admins can now message this family.'
+                                              : 'All members can now message this family.');
+                                    }
                                   },
                                   child: Text(
                                     link.adminsOnly
@@ -2647,11 +2713,17 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                                             Icons.check_circle_rounded),
                                         label: const Text(
                                             'Approve Family Tree Connection'),
-                                        onPressed: () {
-                                          ref
+                                        onPressed: () async {
+                                          final ok = await ref
                                               .read(familyControllerProvider
                                                   .notifier)
                                               .approveFamilyLink(link.id);
+                                          if (context.mounted) {
+                                            showFamilyActionResult(context, ref,
+                                                ok: ok,
+                                                success:
+                                                    '🌳 ${link.connectedFamilyName} is now connected.');
+                                          }
                                         },
                                       )
                                     : ElevatedButton.icon(
@@ -2747,8 +2819,8 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                       ),
                       icon: const Icon(Icons.handshake_rounded, size: 16),
                       label: const Text('Lift Curtain'),
-                      onPressed: () {
-                        ref
+                      onPressed: () async {
+                        final ok = await ref
                             .read(familyControllerProvider.notifier)
                             .updateFamilyPeaceMode(
                               linkId: hiddenLink.id,
@@ -2757,13 +2829,12 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                               hideOurUpdates: false,
                               pausedUntil: null,
                             );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '🤝 Restored ${hiddenLink.connectedFamilyName} back to your Family Tree!',
-                            ),
-                          ),
-                        );
+                        if (context.mounted) {
+                          showFamilyActionResult(context, ref,
+                              ok: ok,
+                              success:
+                                  '🤝 Restored ${hiddenLink.connectedFamilyName} back to your Family Tree!');
+                        }
                       },
                     ),
                   );

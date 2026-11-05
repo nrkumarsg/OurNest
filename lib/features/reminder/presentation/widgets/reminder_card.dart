@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/platform/alarm_scheduler_service.dart';
 import '../../domain/family_reminder_model.dart';
 
-class ReminderCard extends StatelessWidget {
+class ReminderCard extends ConsumerWidget {
   final FamilyReminder reminder;
   final bool isMine;
 
@@ -14,7 +16,7 @@ class ReminderCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: 270,
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -123,14 +125,35 @@ class ReminderCard extends StatelessWidget {
                 ),
               ),
               icon: const Icon(Icons.notification_add_rounded, size: 18),
-              label: const Text('Add to My Device Calendar'),
-              onPressed: () {
+              label: const Text('Remind Me on This Phone'),
+              onPressed: () async {
+                // Really schedules a notification now (F09); before, this
+                // only showed a "scheduled" message.
+                final result = await ref
+                    .read(alarmSchedulerServiceProvider)
+                    .scheduleReminder(
+                      reminderKey: reminder.reminderId,
+                      title: reminder.title,
+                      at: reminder.eventDateTime,
+                      notes: reminder.notes,
+                    );
+                if (!context.mounted) return;
+                final (text, color) = switch (result) {
+                  ReminderScheduleResult.scheduled => (
+                      'You will be reminded on ${reminder.formattedDate} at ${reminder.formattedTime}.',
+                      AppColors.primaryTeal
+                    ),
+                  ReminderScheduleResult.inPast => (
+                      'This event time has already passed.',
+                      AppColors.error
+                    ),
+                  ReminderScheduleResult.unsupported => (
+                      'Phone reminders are only available in the Android / iPhone app.',
+                      AppColors.error
+                    ),
+                };
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        'Reminder scheduled for ${reminder.formattedDate} at ${reminder.formattedTime}!'),
-                    backgroundColor: AppColors.primaryTeal,
-                  ),
+                  SnackBar(content: Text(text), backgroundColor: color),
                 );
               },
             ),

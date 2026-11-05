@@ -18,6 +18,8 @@ class AlarmNotificationTap {
   const AlarmNotificationTap(this.alarm, {required this.isEscalation});
 }
 
+enum ReminderScheduleResult { scheduled, inPast, unsupported }
+
 class AlarmSchedulerService {
   static const String _alarmChannelId = 'ournest_exact_alarms_v1';
   static const String _alarmChannelName = 'OurNest Exact Alarms';
@@ -182,6 +184,67 @@ class AlarmSchedulerService {
         payload: buildPayload(alarm: alarm, escalation: true),
       );
     }
+  }
+
+  /// Real permission state for the settings screen (F35).
+  /// Returns null where it can't be checked (web, desktop, iOS).
+  Future<bool?> alarmPermissionsGranted() async {
+    if (!LocalNotifications.isSupported ||
+        defaultTargetPlatform != TargetPlatform.android) {
+      return null;
+    }
+    await LocalNotifications.ensureInitialized();
+    final android = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    final notificationsOn = await android?.areNotificationsEnabled() ?? false;
+    final exactOn = await android?.canScheduleExactNotifications() ?? false;
+    return notificationsOn && exactOn;
+  }
+
+  /// Asks for notification + exact-alarm permission (opens system settings
+  /// for the exact-alarm one when needed).
+  Future<void> requestAlarmPermissions() async {
+    if (!LocalNotifications.isSupported) return;
+    await LocalNotifications.ensureInitialized(requestPermission: true);
+    final android = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android != null && !(await android.canScheduleExactNotifications() ?? true)) {
+      await android.requestExactAlarmsPermission();
+    }
+  }
+
+  static int reminderId(String id) => stableId('reminder:$id');
+
+  /// Schedules a one-off reminder notification on THIS phone (audit F09:
+  /// the "Add to calendar" button used to only show a snackbar).
+  Future<ReminderScheduleResult> scheduleReminder({
+    required String reminderKey,
+    required String title,
+    required DateTime at,
+    String? notes,
+  }) async {
+    if (!LocalNotifications.isSupported) return ReminderScheduleResult.unsupported;
+    if (!at.isAfter(DateTime.now())) return ReminderScheduleResult.inPast;
+    await init();
+    await _notifications.zonedSchedule(
+      reminderId(reminderKey),
+      '📅 $title',
+      (notes != null && notes.trim().isNotEmpty) ? notes.trim() : 'Family reminder',
+      tz.TZDateTime.from(at, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          LocalNotifications.messageChannelId,
+          LocalNotifications.messageChannelName,
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+    return ReminderScheduleResult.scheduled;
   }
 
   /// Cancels both primary and escalation alarms on this device.

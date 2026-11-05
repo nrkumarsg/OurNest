@@ -223,9 +223,12 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         }
       }
     } else {
+      final err = ref.read(profileControllerProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to save profile. Please try again.'),
+        SnackBar(
+          content: Text(err is StateError
+              ? err.message
+              : 'Failed to save profile. Please try again.'),
           backgroundColor: AppColors.error,
         ),
       );

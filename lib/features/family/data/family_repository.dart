@@ -12,8 +12,6 @@ final familyRepositoryProvider = Provider<FamilyRepository>((ref) {
 
 class FamilyRepository {
   final SupabaseClient _client;
-  final List<FamilyLink> _localFallbackLinks = [];
-  final Map<String, FamilyLink> _peaceOverrides = {};
 
   FamilyRepository(this._client);
 
@@ -53,7 +51,12 @@ class FamilyRepository {
     return Map<String, dynamic>.from(response as Map);
   }
 
-  /// Fetches the user's current family membership (including pending)
+  /// Fetches the user's current family membership (including pending).
+  ///
+  /// A user can end up with more than one membership row (the join RPC allows
+  /// it). `.maybeSingle()` used to throw in that case and locked the user out
+  /// (audit F13). Until the owner decides whether multiple families are
+  /// allowed (Q1), one is picked deterministically: see [pickPrimaryMembership].
   Future<FamilyMember?> getCurrentUserMembership() async {
     final uid = currentUserId;
     if (uid == null) return null;
@@ -62,10 +65,23 @@ class FamilyRepository {
         .from('family_members')
         .select('*, profiles(*)')
         .eq('user_id', uid)
-        .maybeSingle();
+        .order('created_at', ascending: true);
 
-    if (response == null) return null;
-    return FamilyMember.fromJson(response);
+    final memberships = (response as List)
+        .map((e) => FamilyMember.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return pickPrimaryMembership(memberships);
+  }
+
+  /// Prefers an active membership over a pending one, then the oldest.
+  static FamilyMember? pickPrimaryMembership(List<FamilyMember> memberships) {
+    if (memberships.isEmpty) return null;
+    final sorted = [...memberships]
+      ..sort((a, b) {
+        if (a.isActive != b.isActive) return a.isActive ? -1 : 1;
+        return a.createdAt.compareTo(b.createdAt);
+      });
+    return sorted.first;
   }
 
   /// Fetches family details by ID
@@ -185,61 +201,73 @@ class FamilyRepository {
 
   // ---------------------------------------------------------------------------
   // FAMILY-TO-FAMILY TREE CHAIN ("Connected Nests")
+  //
+  // Audit F07 / U19: errors are no longer hidden behind invented "active"
+  // links or in-memory overrides. Every call either saves on the server or
+  // throws, so the screen can tell the user the truth.
   // ---------------------------------------------------------------------------
 
   /// Fetches all connected families in the Family Tree for [myFamilyId]
   Future<List<FamilyLink>> getFamilyLinks(String myFamilyId) async {
+    final rows = await _client
+        .from('family_links')
+        .select()
+        .or('requester_family_id.eq.$myFamilyId,target_family_id.eq.$myFamilyId')
+        .order('created_at', ascending: false);
+
+    // One call for all linked family names (F32: RLS hides other families'
+    // rows, so getFamily() always returned null; this also removes the N+1).
+    final names = await _linkedFamilyNames(myFamilyId);
+
+    return (rows as List).map((raw) {
+      final map = raw as Map<String, dynamic>;
+      final reqId = map['requester_family_id'] as String;
+      final tgtId = map['target_family_id'] as String;
+      final isIncoming = tgtId == myFamilyId;
+      final linkId = map['id'] as String;
+      return FamilyLink(
+        id: linkId,
+        requesterFamilyId: reqId,
+        targetFamilyId: tgtId,
+        connectedFamilyId: isIncoming ? reqId : tgtId,
+        connectedFamilyName: names[linkId] ?? 'Connected Family',
+        // The other family's invite code lets people join it, so it's private
+        // to them and not shown here.
+        connectedInviteCode: '',
+        branchLabel: map['branch_label'] as String? ?? 'Extended Family',
+        messagingPolicy: map['messaging_policy'] as String? ?? 'all_members',
+        status: map['status'] as String? ?? 'pending',
+        isIncomingRequest: isIncoming,
+        createdAt: DateTime.parse(map['created_at'] as String),
+        visibilityMode: map['visibility_mode'] as String? ?? 'visible',
+        hiddenScope: map['hidden_scope'] as String? ?? 'none',
+        hideOurUpdates: map['hide_our_updates'] as bool? ?? false,
+        pausedUntil: map['paused_until'] != null
+            ? DateTime.tryParse(map['paused_until'] as String)
+            : null,
+      );
+    }).toList();
+  }
+
+  Future<Map<String, String>> _linkedFamilyNames(String myFamilyId) async {
     try {
-      final rows = await _client
-          .from('family_links')
-          .select()
-          .or('requester_family_id.eq.$myFamilyId,target_family_id.eq.$myFamilyId')
-          .order('created_at', ascending: false);
-
-      final List<FamilyLink> links = [];
-      for (final raw in (rows as List)) {
-        final map = raw as Map<String, dynamic>;
-        final reqId = map['requester_family_id'] as String;
-        final tgtId = map['target_family_id'] as String;
-        final isIncoming = tgtId == myFamilyId;
-        final otherFamilyId = isIncoming ? reqId : tgtId;
-
-        final otherFam = await getFamily(otherFamilyId);
-        final linkId = map['id'] as String;
-        final override = _peaceOverrides[linkId];
-        links.add(
-          FamilyLink(
-            id: linkId,
-            requesterFamilyId: reqId,
-            targetFamilyId: tgtId,
-            connectedFamilyId: otherFamilyId,
-            connectedFamilyName: otherFam?.name ?? 'Connected Family',
-            connectedInviteCode: otherFam?.inviteCode ?? '------',
-            branchLabel: map['branch_label'] as String? ?? 'Extended Family',
-            messagingPolicy: map['messaging_policy'] as String? ?? 'all_members',
-            status: map['status'] as String? ?? 'active',
-            isIncomingRequest: isIncoming,
-            createdAt: DateTime.parse(map['created_at'] as String),
-            visibilityMode: override?.visibilityMode ??
-                (map['visibility_mode'] as String? ?? 'visible'),
-            hiddenScope: override?.hiddenScope ??
-                (map['hidden_scope'] as String? ?? 'none'),
-            hideOurUpdates: override?.hideOurUpdates ??
-                (map['hide_our_updates'] as bool? ?? false),
-            pausedUntil: override?.pausedUntil ??
-                (map['paused_until'] != null
-                    ? DateTime.tryParse(map['paused_until'] as String)
-                    : null),
-          ),
-        );
-      }
-      return [...links, ..._localFallbackLinks];
-    } catch (_) {
-      return List<FamilyLink>.from(_localFallbackLinks);
+      final res = await _client.rpc(
+        'get_linked_family_names',
+        params: {'my_family_id': myFamilyId},
+      );
+      return {
+        for (final r in (res as List))
+          r['link_id'] as String: r['family_name'] as String,
+      };
+    } on PostgrestException catch (e) {
+      // Migration 20261105000008 not applied yet: keep the placeholder name.
+      if (e.code == 'PGRST202') return {};
+      rethrow;
     }
   }
 
-  /// Requests or establishes a Family-to-Family Tree link by 6-char invite code
+  /// Sends a link request to another family using its 6-char invite code.
+  /// The link stays 'pending' until the other family's admin approves it.
   Future<FamilyLink> linkWithFamily({
     required String myFamilyId,
     required String targetInviteCode,
@@ -248,95 +276,61 @@ class FamilyRepository {
     String messagingPolicy = 'all_members',
   }) async {
     final cleanCode = targetInviteCode.trim().toUpperCase();
-    try {
-      final rpcRes = await _client.rpc(
-        'request_family_link',
-        params: {
-          'my_family_id': myFamilyId,
-          'target_invite_code': cleanCode,
-          'branch_relation_label': branchLabel,
-          'policy_input': messagingPolicy,
-        },
-      );
-      final map = Map<String, dynamic>.from(rpcRes as Map);
-      return FamilyLink(
-        id: map['link_id'] as String,
-        requesterFamilyId: myFamilyId,
-        targetFamilyId: map['target_family_id'] as String,
-        connectedFamilyId: map['target_family_id'] as String,
-        connectedFamilyName:
-            (map['target_family_name'] as String?) ?? targetFamilyNameHint ?? 'Family ($cleanCode)',
-        connectedInviteCode: cleanCode,
-        branchLabel: branchLabel,
-        messagingPolicy: messagingPolicy,
-        status: map['status'] as String? ?? 'pending',
-        createdAt: DateTime.now(),
-      );
-    } catch (_) {
-      // Fallback if migration 20261103000004 is not yet run on Supabase
-      final localLink = FamilyLink(
-        id: 'link-${DateTime.now().millisecondsSinceEpoch}',
-        requesterFamilyId: myFamilyId,
-        targetFamilyId: 'fam-$cleanCode',
-        connectedFamilyId: 'fam-$cleanCode',
-        connectedFamilyName:
-            (targetFamilyNameHint != null && targetFamilyNameHint.isNotEmpty)
-                ? targetFamilyNameHint
-                : 'Relative Family ($cleanCode)',
-        connectedInviteCode: cleanCode,
-        branchLabel: branchLabel,
-        messagingPolicy: messagingPolicy,
-        status: 'active',
-        createdAt: DateTime.now(),
-      );
-      _localFallbackLinks.removeWhere((l) => l.connectedInviteCode == cleanCode);
-      _localFallbackLinks.insert(0, localLink);
-      return localLink;
-    }
+    final rpcRes = await _client.rpc(
+      'request_family_link',
+      params: {
+        'my_family_id': myFamilyId,
+        'target_invite_code': cleanCode,
+        'branch_relation_label': branchLabel,
+        'policy_input': messagingPolicy,
+      },
+    );
+    final map = Map<String, dynamic>.from(rpcRes as Map);
+    return FamilyLink(
+      id: map['link_id'] as String,
+      requesterFamilyId: myFamilyId,
+      targetFamilyId: map['target_family_id'] as String,
+      connectedFamilyId: map['target_family_id'] as String,
+      connectedFamilyName: (map['target_family_name'] as String?) ??
+          targetFamilyNameHint ??
+          'Connected Family',
+      connectedInviteCode: '',
+      branchLabel: branchLabel,
+      messagingPolicy: messagingPolicy,
+      status: map['status'] as String? ?? 'pending',
+      createdAt: DateTime.now(),
+    );
   }
 
-  /// Approves a pending Family-to-Family link
+  /// Approves a pending Family-to-Family link (the database only allows the
+  /// invited family's admin).
   Future<void> approveFamilyLink(String linkId) async {
-    try {
-      await _client
-          .from('family_links')
-          .update({'status': 'active'})
-          .eq('id', linkId);
-    } catch (_) {
-      final idx = _localFallbackLinks.indexWhere((l) => l.id == linkId);
-      if (idx != -1) {
-        _localFallbackLinks[idx] =
-            _localFallbackLinks[idx].copyWith(status: 'active');
-      }
-    }
+    final rows = await _client
+        .from('family_links')
+        .update({'status': 'active'})
+        .eq('id', linkId)
+        .select('id');
+    expectChanged(rows, 'You can only approve requests sent to your family.');
   }
 
   /// Updates the messaging policy ('all_members' vs 'admins_only') for a linked family
   Future<void> updateFamilyLinkPolicy(String linkId, String policy) async {
-    try {
-      await _client
-          .from('family_links')
-          .update({'messaging_policy': policy})
-          .eq('id', linkId);
-    } catch (_) {
-      final idx = _localFallbackLinks.indexWhere((l) => l.id == linkId);
-      if (idx != -1) {
-        _localFallbackLinks[idx] =
-            _localFallbackLinks[idx].copyWith(messagingPolicy: policy);
-      }
-    }
+    final rows = await _client
+        .from('family_links')
+        .update({'messaging_policy': policy})
+        .eq('id', linkId)
+        .select('id');
+    expectChanged(rows, 'Only a family admin can change this.');
   }
 
   /// Removes a Family-to-Family link
   Future<void> removeFamilyLink(String linkId) async {
-    _localFallbackLinks.removeWhere((l) => l.id == linkId);
-    _peaceOverrides.remove(linkId);
-    try {
-      await _client.from('family_links').delete().eq('id', linkId);
-    } catch (_) {}
+    final rows =
+        await _client.from('family_links').delete().eq('id', linkId).select('id');
+    expectChanged(rows, 'Only a family admin can remove this connection.');
   }
 
-  /// Updates Silent Curtain (Peace & Hide Mode) for a connected family without notifying them
+  /// Updates Silent Curtain (Peace & Hide Mode) for a connected family
   Future<void> updateFamilyPeaceMode({
     required String linkId,
     required String visibilityMode, // 'visible' | 'peace_pause' | 'curtain_hidden'
@@ -344,44 +338,22 @@ class FamilyRepository {
     required bool hideOurUpdates,
     DateTime? pausedUntil,
   }) async {
-    final idx = _localFallbackLinks.indexWhere((l) => l.id == linkId);
-    if (idx != -1) {
-      _localFallbackLinks[idx] = _localFallbackLinks[idx].copyWith(
-        visibilityMode: visibilityMode,
-        hiddenScope: hiddenScope,
-        hideOurUpdates: hideOurUpdates,
-        pausedUntil: pausedUntil,
-        clearPausedUntil: pausedUntil == null,
-      );
-    }
+    final rows = await _client
+        .from('family_links')
+        .update({
+          'visibility_mode': visibilityMode,
+          'hidden_scope': hiddenScope,
+          'hide_our_updates': hideOurUpdates,
+          'paused_until': pausedUntil?.toUtc().toIso8601String(),
+        })
+        .eq('id', linkId)
+        .select('id');
+    expectChanged(rows, 'Only a family admin can change this.');
+  }
 
-    _peaceOverrides[linkId] = FamilyLink(
-      id: linkId,
-      requesterFamilyId: '',
-      targetFamilyId: '',
-      connectedFamilyId: '',
-      connectedFamilyName: '',
-      connectedInviteCode: '',
-      branchLabel: '',
-      createdAt: DateTime.now(),
-      visibilityMode: visibilityMode,
-      hiddenScope: hiddenScope,
-      hideOurUpdates: hideOurUpdates,
-      pausedUntil: pausedUntil,
-    );
-
-    try {
-      await _client
-          .from('family_links')
-          .update({
-            'visibility_mode': visibilityMode,
-            'hidden_scope': hiddenScope,
-            'hide_our_updates': hideOurUpdates,
-            'paused_until': pausedUntil?.toIso8601String(),
-          })
-          .eq('id', linkId);
-    } catch (_) {
-      // Handled seamlessly by _peaceOverrides & _localFallbackLinks
-    }
+  /// Row Level Security silently matches 0 rows when you're not allowed,
+  /// which used to look like success. Treat "nothing changed" as an error.
+  static void expectChanged(List<dynamic> rows, String notAllowedMessage) {
+    if (rows.isEmpty) throw StateError(notAllowedMessage);
   }
 }

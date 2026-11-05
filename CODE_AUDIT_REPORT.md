@@ -410,4 +410,48 @@ flutter build web --release → √ Built build\web
 3. Two-phone tests: chat delivery (Phase B) plus push and shared alarm with escalation (Phase C).
 4. Release the new app, then do the Phase A steps (Confirm email ON, run the password reset script).
 
-*Phase C is not committed yet. The `coverage/` folder from the first test run is safe to delete.*
+Phase C was committed on `fix/audit-phase-a` (commit `a0cbd67`). Not pushed.
+
+### Phase D – Remove fake success (done 2026-11-05)
+
+| Finding | Status | What changed (simple words) | Files |
+|---|---|---|---|
+| F07 | ✅ Fixed | No more invented "active" links. A wrong code or no internet now shows the real reason (e.g. "No family found with invite code …"). After sending, the message says it's a **request** that the other admin must approve. | `lib/features/family/data/family_repository.dart`, `family_screen.dart` |
+| U19 | ✅ Fixed | Silent Curtain / Peace Pause no longer keeps a hidden "pretend" copy on the phone. It's saved on the server or you see an error. Approve, policy toggle, unlink and lift curtain also report the real result. When the database quietly blocks a change (0 rows), that now counts as an error instead of "success". | same |
+| F32 | ✅ Fixed (migration, not applied) | Linked families now show their **real name** (new secure function `get_linked_family_names`, with one query instead of one per link). The other family's invite code is **no longer shown**, because it would let people join that family. | `supabase/migrations/20261105000008_linked_names_and_applicants.sql`, `family_repository.dart` |
+| F08 | ✅ Made honest (real delivery needs Q2) | "Multi-Group Broadcast" and "Send Across Family Tree" still post into **your own** family chat (that's all the system can do today), but now say so: "Posted in your family chat. Connected families don't receive broadcasts yet." The button is renamed "Post to Our Family Chat". Building real cross-family delivery waits for your answer to **Q2**. | `family_screen.dart` |
+| (new) | ✅ Fixed | "Unlink Permanently" deleted the connection **without asking**. It now asks for confirmation first. | `family_screen.dart` |
+| F09 | ✅ Fixed | "Add to My Device Calendar" only showed a message. It's now **"Remind Me on This Phone"** and really schedules a notification at the event time. It also says so if the time has passed, or if you're in the browser where this isn't available. | `reminder_card.dart`, `alarm_scheduler_service.dart` |
+| F10 | ✅ Fixed | Profile save no longer pretends to succeed, and no longer silently drops your phone number when another account uses it. You now see a clear reason, e.g. "This phone number is already used by another OurNest account." | `lib/features/profile/data/profile_repository.dart`, `profile_setup_screen.dart` |
+| F13 | ✅ Crash fixed (rule still needs Q1) | A user with two family memberships is no longer locked out. The app picks the **active** one (else the oldest). Whether two families should be allowed at all is still your decision (**Q1**). | `family_repository.dart` |
+| F17 | ✅ Fixed (migration, not applied) | Admins can now see the name and profile of someone **waiting for approval**, instead of "Family Member". Only the admins of that family can see it. | migration `…000008` |
+| (Phase C follow-up) | ✅ Fixed | The alarm card now changes to "✓ … is awake!" or "Cancelled" when that event arrives in the chat. | `lib/features/alarm/presentation/alarm_status_provider.dart` (new), `alarm_card.dart` |
+| F35 | ✅ Fixed | The "Alarm & Reminders Permission" row shows the **real** state (allowed or not allowed) and asks for permission when tapped. The version label now reads `1.2.3 (Build 6)` from one constant, and a test fails if it ever differs from `pubspec.yaml`. | `settings_screen.dart`, `lib/core/constants/app_version.dart` (new) |
+| F36 (part) | ✅ | Removed one unused import from Settings. | `settings_screen.dart` |
+
+**Left alone on purpose (business decisions, see Questions):**
+- **F16 (Q4):** an admin can still leave without naming a successor.
+- **F34 (Q5):** the "SPONSORED" card is still there.
+- **F08 / Q2:** real cross-family messaging isn't built.
+- **F13 / Q1:** joining a second family is still allowed by the server.
+
+**Note:** I tried `package_info_plus` for the version, but its current release needs Kotlin 2 and this Android project is on Kotlin 1.8.22. The build failed, so I removed it and used a checked constant. Upgrading Kotlin/AGP is part of Phase F.
+
+**Checks after Phase D (actual results):**
+```
+flutter analyze  → 16 issues (was 21), 0 errors, 0 new
+flutter test     → 00:06 +87: All tests passed!  (72 + 15 new in test/unit/honest_ui_phase_d_test.dart)
+flutter build apk --debug   → √ Built build\app\outputs\flutter-apk\app-debug.apk
+flutter build web --release → √ Built build\web
+```
+
+**Not verified yet:** migration `…000008` (apply after 5, 6 and 7, staging first). The family-link screens need a click-through with two real families after the migrations are applied.
+
+### Updated owner checklist
+1. Apply migrations in order: `…000005` → `…000006` → `…000007` → `…000008` (staging first).
+2. `supabase/manual/PUSH_SETUP.md` for push.
+3. Two-phone / two-family tests: chat, push, shared alarm, link request plus approval, pending applicant name visible to admin.
+4. Release the new app, then do the Phase A steps (Confirm email ON, run the password reset script).
+5. Answer **Q1, Q2, Q4, Q5** so the remaining Phase D items can be finished.
+
+*Phase D is not committed yet. The `coverage/` folder from the first test run is safe to delete.*
