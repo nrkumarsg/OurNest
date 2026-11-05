@@ -339,4 +339,38 @@ flutter build apk --debug → √ Built build\app\outputs\flutter-apk\app-debug.
 3. Run `supabase/manual/2026-11-05_reset_derived_passwords.sql` in the SQL Editor. It resets passwords to random values and signs everyone out, but doesn't touch messages or families.
 4. Apply `supabase/migrations/20261105000005_security_hardening.sql` (staging first).
 
-*No commits or pushes have been made. The `coverage/` folder from the first test run is still in the project and safe to delete.*
+Phase A was committed on branch `fix/audit-phase-a` (commit `0bf8265`). Not pushed.
+
+### Phase B – Make core chat actually work (done 2026-11-05)
+
+| Finding | Status | What changed (simple words) | Files |
+|---|---|---|---|
+| F03 | ✅ Fixed (migration written, **not applied**) | New database function `send_message` saves the message, its recipients and its keys **together in one step**, so Realtime can see the recipients when it decides who gets the live update. It runs with the user's own permissions, so all security rules still apply. Also added indexes for the sync queries. If the function isn't on the server yet, the app falls back to the old way, but **only** for "function not found"; any other error is shown to the user. | `supabase/migrations/20261105000006_atomic_send_message.sql`, `lib/features/chat/data/chat_repository.dart` |
+| F02 | ✅ Fixed | New **catch-up sync**. Every time the chat connects or reconnects, the app downloads messages it doesn't have yet (in pages of 200) and decrypts them with one key lookup per batch. If the phone or browser has nothing stored (new phone, reinstall, web refresh, after sign-out), it restores the latest 300 messages. "Delete for everyone" from the last 7 days is applied too. Messages you sent from *another* of your devices now show up (before, they were skipped). | `chat_repository.dart`, `lib/core/database/app_database.dart` |
+| F02 (web) | ✅ Solved by sync | Instead of adding a browser database, the web app now **re-downloads history from the server** after a refresh, and the device key is kept in the browser. This avoids storing decrypted messages in the browser. | same |
+| F22 | ✅ Fixed | The recipient list now travels **inside the encrypted message**, so the server doesn't learn more. A private chat with Dad shows only messages between you and Dad. A "selected members" message to 3+ people shows in the family chat with its "selected" badge. Old messages without the list use the old rule, so nothing disappears. | `lib/features/chat/domain/message_payload.dart`, `lib/features/chat/domain/thread_filter.dart` (new), `app_database.dart` |
+| F23 | ✅ Fixed | If sending fails, the typed text and the reply you were writing come back, and an error message explains why. Photo, voice, location and checklist sends also show an error now. Double-tapping Send no longer sends twice. | `lib/features/chat/presentation/chat_screen.dart` |
+| F24 | ✅ Fixed | Read receipts are sent **once per message**, batched into one broadcast, instead of once per message on every screen refresh. Older app versions still understand the receipt (for the newest message in the batch). | `chat_repository.dart` |
+
+**Limits to know about:**
+- Messages sent **before** a device was registered can't be decrypted on that device; there's no key for it, and that's how end-to-end encryption works. A new phone sees history from the moment it was set up. Fixing this would need encrypted key backup (a business decision, see Q7).
+- Sync runs when the chat connects or reconnects. It doesn't run in the background while the app is closed; that needs push notifications (Phase C).
+
+**Checks after Phase B (actual results):**
+```
+flutter analyze  → 27 issues, 0 new (same pre-existing lint list)
+flutter test     → 00:04 +57: All tests passed!  (43 + 14 new in test/unit/chat_phase_b_test.dart)
+flutter build web --release → √ Built build\web
+```
+
+**Not verified yet:** both migrations (Phase A and B) still need to be applied, staging first. The live-delivery fix (F03) and the sync need a test with **two real devices or browsers** after the migrations are applied:
+1. A sends while B is closed, then B opens: B should see the message.
+2. Both are open: B should see A's message within a second.
+3. Refresh the web app: history should come back.
+
+### Updated owner checklist
+1. Apply `20261105000005_security_hardening.sql`, **then** `20261105000006_atomic_send_message.sql` (staging first).
+2. Do the two-device test above.
+3. Release the new app, then do the Phase A steps (Confirm email ON, run the password reset script).
+
+*Phase B is not committed yet. The `coverage/` folder from the first test run is safe to delete.*

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../features/chat/domain/thread_filter.dart';
 import 'connection/connection_stub.dart'
     if (dart.library.io) 'connection/connection_native.dart'
     if (dart.library.js_interop) 'connection/connection_web.dart';
@@ -34,49 +35,56 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 1;
 
-  // Web / PWA in-memory reactive message store (avoids needing external sqlite3.wasm)
+  // Web / PWA in-memory reactive message store (avoids needing external sqlite3.wasm).
+  // History is restored from the server by ChatRepository.syncMissedMessages
+  // after a page reload (audit F02).
   final Map<String, LocalMessage> _webMessages = {};
   final StreamController<void> _webChanges =
       StreamController<void>.broadcast();
 
-  List<LocalMessage> _filterWebFamilyMessages(String familyId) {
-    final list = _webMessages.values
-        .where((t) => t.familyId == familyId && t.audience == 'all')
-        .toList();
+  static List<LocalMessage> _sorted(Iterable<LocalMessage> rows) {
+    final list = rows.toList();
     list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return list;
   }
 
-  List<LocalMessage> _filterWebDirectMessages({
-    required String familyId,
+  static List<LocalMessage> _familyThread(Iterable<LocalMessage> rows) =>
+      _sorted(rows.where((t) => ThreadFilter.belongsInFamilyThread(
+            audience: t.audience,
+            recipientIds: t.recipientIds,
+          )));
+
+  static List<LocalMessage> _directThread(
+    Iterable<LocalMessage> rows, {
     required String otherUserId,
     required String myUserId,
-  }) {
-    final list = _webMessages.values
-        .where((t) =>
-            t.familyId == familyId &&
-            t.audience == 'selected' &&
-            (t.senderId == otherUserId || t.senderId == myUserId))
-        .toList();
-    list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    return list;
+  }) =>
+      _sorted(rows.where((t) => ThreadFilter.belongsInDirectThread(
+            audience: t.audience,
+            senderId: t.senderId,
+            recipientIds: t.recipientIds,
+            myUserId: myUserId,
+            otherUserId: otherUserId,
+          )));
+
+  Stream<List<LocalMessage>> _watchWeb(
+      List<LocalMessage> Function() snapshot) {
+    return Stream.multi((controller) {
+      controller.add(snapshot());
+      final sub = _webChanges.stream.listen((_) => controller.add(snapshot()));
+      controller.onCancel = sub.cancel;
+    });
   }
 
   // Queries
   Stream<List<LocalMessage>> watchFamilyMessages(String familyId) {
     if (kIsWeb) {
-      return Stream.multi((controller) {
-        controller.add(_filterWebFamilyMessages(familyId));
-        final sub = _webChanges.stream.listen((_) {
-          controller.add(_filterWebFamilyMessages(familyId));
-        });
-        controller.onCancel = sub.cancel;
-      });
+      return _watchWeb(() => _familyThread(
+          _webMessages.values.where((t) => t.familyId == familyId)));
     }
-    return (select(localMessages)
-          ..where((t) => t.familyId.equals(familyId) & t.audience.equals('all'))
-          ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc)]))
-        .watch();
+    return (select(localMessages)..where((t) => t.familyId.equals(familyId)))
+        .watch()
+        .map(_familyThread);
   }
 
   Stream<List<LocalMessage>> watchDirectMessages({
@@ -85,29 +93,47 @@ class AppDatabase extends _$AppDatabase {
     required String myUserId,
   }) {
     if (kIsWeb) {
-      return Stream.multi((controller) {
-        controller.add(_filterWebDirectMessages(
-          familyId: familyId,
-          otherUserId: otherUserId,
-          myUserId: myUserId,
-        ));
-        final sub = _webChanges.stream.listen((_) {
-          controller.add(_filterWebDirectMessages(
-            familyId: familyId,
+      return _watchWeb(() => _directThread(
+            _webMessages.values.where(
+                (t) => t.familyId == familyId && t.audience == 'selected'),
             otherUserId: otherUserId,
             myUserId: myUserId,
           ));
-        });
-        controller.onCancel = sub.cancel;
-      });
     }
     return (select(localMessages)
           ..where((t) =>
-              t.familyId.equals(familyId) &
-              t.audience.equals('selected') &
-              (t.senderId.equals(otherUserId) | t.senderId.equals(myUserId)))
-          ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc)]))
-        .watch();
+              t.familyId.equals(familyId) & t.audience.equals('selected')))
+        .watch()
+        .map((rows) => _directThread(rows,
+            otherUserId: otherUserId, myUserId: myUserId));
+  }
+
+  /// True if this message is already stored locally (used to skip duplicates).
+  Future<bool> hasMessage(String messageId) async {
+    if (kIsWeb) return _webMessages.containsKey(messageId);
+    final row = await (select(localMessages)
+          ..where((t) => t.id.equals(messageId)))
+        .getSingleOrNull();
+    return row != null;
+  }
+
+  /// Newest message time stored for a family, or null if nothing is stored.
+  /// Used as the starting point for the catch-up sync.
+  Future<DateTime?> latestMessageTime(String familyId) async {
+    if (kIsWeb) {
+      DateTime? latest;
+      for (final m in _webMessages.values) {
+        if (m.familyId != familyId) continue;
+        if (latest == null || m.createdAt.isAfter(latest)) latest = m.createdAt;
+      }
+      return latest;
+    }
+    final maxExpr = localMessages.createdAt.max();
+    final query = selectOnly(localMessages)
+      ..addColumns([maxExpr])
+      ..where(localMessages.familyId.equals(familyId));
+    final row = await query.getSingleOrNull();
+    return row?.read(maxExpr);
   }
 
   Future<void> insertOrUpdateMessage(LocalMessagesCompanion message) async {
@@ -159,10 +185,12 @@ class AppDatabase extends _$AppDatabase {
     await into(localMessages).insertOnConflictUpdate(message);
   }
 
+  /// Marks a message as deleted. No-op if it's unknown or already deleted, so
+  /// repeated syncs don't keep re-writing (and re-rendering) the same row.
   Future<void> markDeleted(String messageId) async {
     if (kIsWeb) {
       final existing = _webMessages[messageId];
-      if (existing != null) {
+      if (existing != null && existing.deletedAt == null) {
         _webMessages[messageId] = existing.copyWith(
           deletedAt: Value(DateTime.now()),
           plaintext: 'This message was deleted',
@@ -171,7 +199,9 @@ class AppDatabase extends _$AppDatabase {
       }
       return;
     }
-    await (update(localMessages)..where((t) => t.id.equals(messageId))).write(
+    await (update(localMessages)
+          ..where((t) => t.id.equals(messageId) & t.deletedAt.isNull()))
+        .write(
       LocalMessagesCompanion(
         deletedAt: Value(DateTime.now()),
         plaintext: const Value('This message was deleted'),

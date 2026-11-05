@@ -80,22 +80,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  /// Shows why a send failed so the message never silently disappears (F23).
+  void _showSendError() {
+    if (!mounted) return;
+    final err = ref.read(chatControllerProvider).error;
+    final detail = err is StateError ? err.message : null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(detail ??
+            'Message not sent. Check your internet connection and try again.'),
+        backgroundColor: AppColors.error,
+      ),
+    );
+  }
+
+  bool _sending = false;
+
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _sending) return; // ignore double taps
 
     final membership = ref.read(currentMembershipProvider).value;
     if (membership == null) return;
 
     final audienceState = ref.read(audienceStateProvider);
-    final replySnippet = _replyingTo != null
-        ? '${_replyingTo!.senderName ?? "Member"}: ${_replyingTo!.displayText}'
+    final replyingTo = _replyingTo;
+    final replySnippet = replyingTo != null
+        ? '${replyingTo.senderName ?? "Member"}: ${replyingTo.displayText}'
         : null;
 
+    // Clear optimistically, but put everything back if sending fails.
+    _sending = true;
     _textController.clear();
     setState(() => _replyingTo = null);
 
-    await ref.read(chatControllerProvider.notifier).sendMessage(
+    final ok = await ref.read(chatControllerProvider.notifier).sendMessage(
           familyId: membership.familyId,
           text: text,
           audience: _isDirect ? MessageAudience.selected : audienceState.audience,
@@ -104,6 +123,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               : audienceState.selectedRecipientIds,
           replyToId: replySnippet,
         );
+    _sending = false;
+
+    if (!ok) {
+      if (mounted) {
+        if (_textController.text.isEmpty) _textController.text = text;
+        setState(() => _replyingTo = replyingTo);
+      }
+      _showSendError();
+      return;
+    }
 
     _scrollToBottom();
   }
@@ -118,7 +147,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final audienceState = ref.read(audienceStateProvider);
 
-    await ref.read(chatControllerProvider.notifier).sendMediaMessage(
+    final ok = await ref.read(chatControllerProvider.notifier).sendMediaMessage(
           familyId: membership.familyId,
           audience: _isDirect ? MessageAudience.selected : audienceState.audience,
           selectedRecipientIds: _isDirect
@@ -130,6 +159,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           caption: 'Photo',
         );
 
+    if (!ok) {
+      _showSendError();
+      return;
+    }
     _scrollToBottom();
   }
 
@@ -168,7 +201,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if (membership == null) return;
           final audienceState = ref.read(audienceStateProvider);
 
-          await ref.read(chatControllerProvider.notifier).sendMessage(
+          final ok = await ref.read(chatControllerProvider.notifier).sendMessage(
                 familyId: membership.familyId,
                 text: locationText,
                 audience: _isDirect
@@ -178,6 +211,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ? [_directMemberId!]
                     : audienceState.selectedRecipientIds,
               );
+          if (!ok) {
+            _showSendError();
+            return;
+          }
           _scrollToBottom();
         },
       ),
@@ -197,7 +234,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if (membership == null) return;
           final audienceState = ref.read(audienceStateProvider);
 
-          await ref.read(chatControllerProvider.notifier).sendMessage(
+          final ok = await ref.read(chatControllerProvider.notifier).sendMessage(
                 familyId: membership.familyId,
                 text: checklistText,
                 audience: _isDirect
@@ -207,6 +244,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ? [_directMemberId!]
                     : audienceState.selectedRecipientIds,
               );
+          if (!ok) {
+            _showSendError();
+            return;
+          }
           _scrollToBottom();
         },
       ),
@@ -227,7 +268,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       builder: (ctx) => VoiceRecorderSheet(
         onComplete: (bytes, durationMs) async {
-          await ref.read(chatControllerProvider.notifier).sendMediaMessage(
+          final ok = await ref.read(chatControllerProvider.notifier).sendMediaMessage(
                 familyId: membership.familyId,
                 audience:
                     _isDirect ? MessageAudience.selected : audienceState.audience,
@@ -239,6 +280,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 type: MessageType.voice,
                 durationMs: durationMs,
               );
+          if (!ok) {
+            _showSendError();
+            return;
+          }
           _scrollToBottom();
         },
       ),
