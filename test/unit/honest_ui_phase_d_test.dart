@@ -103,8 +103,15 @@ void main() {
 
   group('F08 – broadcast wording is honest', () {
     test('no "delivered" claim for connected families', () {
-      final ui = File('lib/features/family/presentation/family_screen.dart')
-          .readAsStringSync();
+      // The family screen is split into part files (F39); read all of them.
+      final ui = [
+        'family_screen.dart',
+        'family_screen_link_sheets.dart',
+        'family_screen_tabs.dart',
+      ]
+          .map((f) =>
+              File('lib/features/family/presentation/$f').readAsStringSync())
+          .join('\n');
       expect(ui.contains('Broadcast delivered to'), isFalse);
       expect(ui, contains("Connected families don\\'t receive broadcasts yet"));
       expect(ui, contains('Unlink this family?'));

@@ -7,6 +7,7 @@ import 'core/platform/alarm_scheduler_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
+import 'features/share/share_intake.dart';
 
 /// Opens the right screen for a tapped notification payload.
 class NotificationRouting {
@@ -31,6 +32,7 @@ class OurNestApp extends ConsumerStatefulWidget {
 
 class _OurNestAppState extends ConsumerState<OurNestApp> {
   StreamSubscription<String>? _tapSub;
+  StreamSubscription<dynamic>? _shareSub;
 
   @override
   void initState() {
@@ -40,11 +42,18 @@ class _OurNestAppState extends ConsumerState<OurNestApp> {
     _tapSub = LocalNotifications.taps.listen((payload) {
       NotificationRouting.open(ref.read(appRouterProvider), payload);
     });
+    // Text, links or photos shared from other apps open the family chat
+    // (F44). The sign-in guard sends signed-out users to login first; the
+    // share waits in pendingShareProvider until they reach home.
+    _shareSub = ShareIntake.start(ref, onShare: (_) {
+      ref.read(appRouterProvider).push('/chat/family');
+    });
   }
 
   @override
   void dispose() {
     _tapSub?.cancel();
+    _shareSub?.cancel();
     super.dispose();
   }
 

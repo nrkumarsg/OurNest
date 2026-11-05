@@ -54,6 +54,7 @@ dependencies:
   # Push notifications (FCM) – only active when FIREBASE_* dart-defines are set
   firebase_core: ^4.7.0
   firebase_messaging: ^16.2.0
+  receive_sharing_intent: ^1.8.1
 
 dev_dependencies:
   flutter_test:

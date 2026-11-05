@@ -135,6 +135,7 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
     required MessageAudience audience,
     List<String> selectedRecipientIds = const [],
     String? replyToId,
+    String? replyToMessageId,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -144,6 +145,7 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
         audience: audience,
         selectedRecipientUserIds: selectedRecipientIds,
         replyToId: replyToId,
+        replyToMessageId: replyToMessageId,
       );
       state = const AsyncValue.data(null);
       return true;

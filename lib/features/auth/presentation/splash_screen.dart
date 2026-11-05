@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../app.dart' show NotificationRouting;
 import '../../../core/notifications/notification_service.dart';
+import '../../share/share_intake.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -59,6 +60,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           final launchPayload = LocalNotifications.takeLaunchPayload();
           if (launchPayload != null) {
             NotificationRouting.open(GoRouter.of(context), launchPayload);
+          } else if (ref.read(pendingShareProvider) != null) {
+            // App was opened from another app's share menu (F44).
+            GoRouter.of(context).push('/chat/family');
           }
         }
       } else {

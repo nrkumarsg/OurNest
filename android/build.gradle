@@ -18,6 +18,19 @@ subprojects {
         }
     }
 }
+// receive_sharing_intent (share-into-OurNest, audit F44) compiles its Kotlin
+// for JVM 17 but leaves its Java at 1.8, which Gradle rejects. Align only
+// that plugin module to 17; other plugins keep their own settings.
+subprojects { sub ->
+    if (sub.name == "receive_sharing_intent") {
+        sub.pluginManager.withPlugin("com.android.library") {
+            sub.android.compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+        }
+    }
+}
 subprojects {
     project.evaluationDependsOn(":app")
 }

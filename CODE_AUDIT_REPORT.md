@@ -614,4 +614,40 @@ Branch `fix/audit-phase-a`, **not pushed**:
 7. Two-phone test of flows 5–17 above.
 8. Later: the Flutter upgrade plan, and a decision on F44 (build share-into-OurNest or remove the promise).
 
+---
+
+## 12. Final fixes before the pull request (2026-11-05)
+
+The owner asked to fix the remaining mistakes before pushing. Decisions: **build** share-into-OurNest (F44); **keep the Flutter SDK upgrade (F29) for later.**
+
+| Finding | Status | What changed (simple words) | Files |
+|---|---|---|---|
+| F44 | ✅ Fixed (Android; needs a phone test) | Sharing a link, text or photos from another app (YouTube, browser, Gallery…) into OurNest now opens the **family chat**. Text and links are pre-filled for you to check and send; photos (up to 10) ask "Send N photos?" first. If you weren't signed in, the share waits until you are. iPhone would need a separate "Share Extension", which this project doesn't have. | `lib/features/share/share_intake.dart` (new), `app.dart`, `splash_screen.dart`, `chat_screen.dart`, `pubspec.yaml` (`receive_sharing_intent 1.8.1`), `android/build.gradle` (Java 17 for that plugin only) |
+| F37 | ✅ Fixed | A reply now also stores the **real ID** of the message it answers (`reply_to_id`). The quoted text stays under the old key, so older app versions still show it. *Tap-to-jump to the original message isn't built yet; the ID is what makes it possible.* | `message_payload.dart`, `chat_repository.dart`, `chat_controller.dart`, `chat_screen.dart` |
+| F31 | ✅ Fixed | If the app can't start its server connection, it shows **"OurNest can't connect right now – Try again"** instead of carrying on and crashing. Every uncaught error is logged. The empty `catch (_) {}` blocks in startup are gone. (A crash-reporting service like Sentry/Crashlytics can be added later; that's a third-party choice for you.) | `lib/main.dart`, `supabase_client.dart` |
+| F39 | ✅ Fixed | `family_screen.dart` went from **3,101 lines to 424**. The Connected-Nests sheets and the three tabs moved, unchanged, into `family_screen_link_sheets.dart` (1,392) and `family_screen_tabs.dart` (1,302). | `lib/features/family/presentation/family_screen*.dart` |
+| F42 | ✅ Fixed (script not run) | New `scripts/build_release.ps1` rebuilds **everything the site serves** the same way every time: the web app for `/app/`, the Windows zip and the signed APK. It runs analyze and tests first, and **refuses to finish if a `.env` file ends up in `landing/`**. The APK download name is now `OurNest.apk` instead of the stale `OurNest-v1.2.1.apk`; old links still work through the existing redirect. I only syntax-checked it; running it would replace the files your site currently serves, which should happen after the migrations are applied. | `scripts/build_release.ps1` (new), `netlify.toml` |
+| F29 | ⏸ Later (owner decision) | Flutter SDK + package upgrade, including replacing the discontinued crypto library. Plan in section 9 (Phase F). | – |
+
+**Checks (actual results):**
+```
+flutter analyze  → No issues found!
+flutter test     → 00:08 +130: All tests passed!   (119 + 11 new in test/unit/final_fixes_test.dart)
+flutter build apk --debug   → √ Built build\app\outputs\flutter-apk\app-debug.apk
+flutter build apk --release --android-project-arg=ournest.allowDebugSigning=true → √ Built app-release.apk (86.8MB)
+flutter build web --release → √ Built build\web
+scripts/build_release.ps1   → PowerShell parse OK (not executed)
+```
+
+**Walkthrough update:** flow 20 ("Share a link or photo from another app into OurNest") changes from **FAIL** to **PASS (code + tests)**; it needs a phone test on Android.
+
+**Where every finding stands now:**
+- **Fixed in code:** 39 of 44.
+- **F08:** honest wording; real cross-family delivery isn't built (decision Q2).
+- **F04:** push needs your Firebase setup.
+- **F03:** needs the two-device check.
+- **F29:** the Flutter upgrade, deferred by your decision.
+
+**Health score: about 7 / 10 in code.** It should reach roughly 8 once the migrations are applied, the password reset is done and the two-phone tests pass.
+
 *The `coverage/` folder (from the test runs) and `.claude/launch.json` (local web preview) are safe to delete.*

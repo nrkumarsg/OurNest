@@ -64,6 +64,7 @@ class ChatRepository {
     List<String> selectedRecipientUserIds = const [],
     MessageType type = MessageType.text,
     String? replyToId,
+    String? replyToMessageId,
     Map<String, dynamic>? mediaMeta,
     Map<String, dynamic>? alarmMeta,
   }) async {
@@ -97,6 +98,7 @@ class ChatRepository {
     final payload = MessagePayload(
       text: text,
       replyToId: replyToId,
+      replyToMessageId: replyToMessageId,
       mediaMeta: mediaMeta,
       alarmMeta: alarmMeta,
       recipientIds: targetUserIds,

@@ -3,7 +3,15 @@ import 'dart:convert';
 /// Structure of the decrypted JSON payload that travels inside the XChaCha20 ciphertext.
 class MessagePayload {
   final String text;
+
+  /// The QUOTED TEXT of the message being replied to ("Amma: Had food?").
+  /// Historical name: it never held an ID. Kept under JSON key 'reply_to' so
+  /// older app versions still show the quote.
   final String? replyToId;
+
+  /// The real ID of the message being replied to (audit F37). Null for
+  /// replies sent by older app versions.
+  final String? replyToMessageId;
   final Map<String, dynamic>? mediaMeta; // Used in Phase 4 for photos & voice notes
   final Map<String, dynamic>? alarmMeta; // Used in Phase 5 for alarms
 
@@ -18,6 +26,7 @@ class MessagePayload {
   const MessagePayload({
     required this.text,
     this.replyToId,
+    this.replyToMessageId,
     this.mediaMeta,
     this.alarmMeta,
     this.recipientIds,
@@ -28,6 +37,7 @@ class MessagePayload {
     return MessagePayload(
       text: json['text'] as String? ?? '',
       replyToId: json['reply_to'] as String?,
+      replyToMessageId: json['reply_to_id'] as String?,
       mediaMeta: json['media_meta'] as Map<String, dynamic>?,
       alarmMeta: json['alarm_meta'] as Map<String, dynamic>?,
       recipientIds: rawRecipients is List
@@ -50,6 +60,7 @@ class MessagePayload {
     return {
       'text': text,
       'reply_to': replyToId,
+      if (replyToMessageId != null) 'reply_to_id': replyToMessageId,
       if (mediaMeta != null) 'media_meta': mediaMeta,
       if (alarmMeta != null) 'alarm_meta': alarmMeta,
       if (recipientIds != null) 'recipients': recipientIds,

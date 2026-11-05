@@ -8,6 +8,7 @@ import '../../alarm/domain/alarm_time_parser.dart';
 import '../../alarm/presentation/alarm_creation_sheet.dart';
 import '../../family/presentation/family_controller.dart';
 import '../../reminder/presentation/reminder_creation_sheet.dart';
+import '../../share/share_intake.dart';
 import '../data/chat_repository.dart';
 import '../domain/chat_message_model.dart';
 import 'chat_controller.dart';
@@ -46,6 +47,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(audienceStateProvider.notifier).setSelected([_directMemberId!]);
       });
+    }
+
+    // Shared from another app (F44): pre-fill text / offer to send photos.
+    if (!_isDirect) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _consumePendingShare());
     }
 
     _textController.addListener(() {
@@ -122,6 +128,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ? [_directMemberId!]
               : audienceState.selectedRecipientIds,
           replyToId: replySnippet,
+          replyToMessageId: replyingTo?.id,
         );
     _sending = false;
 
@@ -134,6 +141,61 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return;
     }
 
+    _scrollToBottom();
+  }
+
+  Future<void> _consumePendingShare() async {
+    if (!mounted) return;
+    final share = ref.read(pendingShareProvider);
+    if (share == null) return;
+    ref.read(pendingShareProvider.notifier).state = null;
+
+    final text = share.text;
+    if (text != null && text.isNotEmpty && _textController.text.isEmpty) {
+      _textController.text = text; // the user reviews it and taps Send
+      _focusNode.requestFocus();
+    }
+    if (share.imagePaths.isEmpty) return;
+
+    final count = share.imagePaths.length;
+    final send = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(count == 1 ? 'Send this photo?' : 'Send $count photos?'),
+        content: const Text(
+            'They will be encrypted and sent to your family chat.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Send')),
+        ],
+      ),
+    );
+    if (send != true || !mounted) return;
+
+    final membership = ref.read(currentMembershipProvider).value;
+    if (membership == null) return;
+    final audienceState = ref.read(audienceStateProvider);
+    for (final path in share.imagePaths) {
+      final bytes = await XFile(path).readAsBytes();
+      final ext = path.contains('.') ? path.split('.').last.toLowerCase() : 'jpg';
+      final ok = await ref.read(chatControllerProvider.notifier).sendMediaMessage(
+            familyId: membership.familyId,
+            audience: audienceState.audience,
+            selectedRecipientIds: audienceState.selectedRecipientIds,
+            rawBytes: bytes,
+            fileExtension: ext.length <= 5 ? ext : 'jpg',
+            type: MessageType.photo,
+            caption: 'Photo',
+          );
+      if (!ok) {
+        _showSendError();
+        return;
+      }
+    }
     _scrollToBottom();
   }
 

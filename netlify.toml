@@ -15,7 +15,8 @@
   for = "/*.apk"
   [headers.values]
     Content-Type = "application/vnd.android.package-archive"
-    Content-Disposition = "attachment; filename=\"OurNest-v1.2.1.apk\""
+    # Version-free name so it never goes stale (audit F35/F42)
+    Content-Disposition = "attachment; filename=\"OurNest.apk\""
     Cache-Control = "no-cache"
 
 [[headers]]

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/env.dart';
@@ -9,7 +10,9 @@ final supabaseClientProvider = Provider<SupabaseClient>((ref) {
 
 /// Initialization helper for Supabase
 class SupabaseService {
-  static Future<void> init() async {
+  /// Returns true when the client is ready. Audit F31: errors used to be
+  /// swallowed, and the app then crashed later at `Supabase.instance`.
+  static Future<bool> init() async {
     try {
       await Supabase.initialize(
         url: Env.supabaseUrl,
@@ -18,8 +21,10 @@ class SupabaseService {
           authFlowType: AuthFlowType.pkce,
         ),
       );
-    } catch (_) {
-      // Prevent crash if offline or initial handshake delayed
+      return true;
+    } catch (e, st) {
+      debugPrint('Supabase init failed: $e $st');
+      return false;
     }
   }
 }
