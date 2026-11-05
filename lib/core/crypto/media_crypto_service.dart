@@ -43,6 +43,9 @@ class MediaCryptoService {
 
   MediaCryptoService(this._crypto, this._client);
 
+  /// Drops decrypted photos / voice notes held in memory (called on sign-out).
+  void clearCache() => _decryptedCache.clear();
+
   /// Encrypts local raw file bytes and uploads the ciphertext to private Supabase Storage
   Future<EncryptedMediaResult> encryptAndUploadMedia({
     required String familyId,

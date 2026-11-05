@@ -348,5 +348,14 @@ class ChatRepository {
 
   void dispose() {
     _subscription?.unsubscribe();
+    _subscription = null;
+  }
+
+  /// Stops realtime sync and forgets in-memory presence / receipt state.
+  void resetForSignOut() {
+    dispose();
+    _ref.read(onlineUserIdsProvider.notifier).state = <String>{};
+    _ref.read(deliveredMessageIdsProvider.notifier).state = <String>{};
+    _ref.read(readMessageIdsProvider.notifier).state = <String>{};
   }
 }

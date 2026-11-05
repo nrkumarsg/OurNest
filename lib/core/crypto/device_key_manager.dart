@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -14,15 +13,33 @@ final deviceKeyManagerProvider = Provider<DeviceKeyManager>((ref) {
   return DeviceKeyManager(crypto, client);
 });
 
+/// Builds the secure-storage key names for one user.
+///
+/// Keys are scoped per user so that when a second person signs in on the same
+/// phone they never reuse the first person's device identity (audit F11).
+@visibleForTesting
+class DeviceKeyStorageNames {
+  final String privateKey;
+  final String publicKey;
+  final String deviceId;
+
+  DeviceKeyStorageNames.forUser(String userId)
+      : privateKey = 'ournest_device_private_key_v2_$userId',
+        publicKey = 'ournest_device_public_key_v2_$userId',
+        deviceId = 'ournest_device_id_v2_$userId';
+}
+
 class DeviceKeyManager {
-  static const _kPrivateKeyStorageKey = 'ournest_device_private_key_v1';
-  static const _kPublicKeyStorageKey = 'ournest_device_public_key_v1';
-  static const _kDeviceIdStorageKey = 'ournest_device_id_v1';
+  // Legacy (v1) names were shared by every user of the device.
+  static const _kLegacyPrivateKey = 'ournest_device_private_key_v1';
+  static const _kLegacyPublicKey = 'ournest_device_public_key_v1';
+  static const _kLegacyDeviceId = 'ournest_device_id_v1';
 
   final CryptoService _crypto;
   final SupabaseClient _client;
   final FlutterSecureStorage _storage;
 
+  String? _userId;
   String? _deviceId;
   Uint8List? _publicKey;
   SecureKey? _secretKey;
@@ -37,35 +54,43 @@ class DeviceKeyManager {
   Uint8List? get currentPublicKey => _publicKey;
   SecureKey? get currentSecretKey => _secretKey;
 
-  /// Ensures a valid X25519 key pair exists for this device, and is registered in Supabase.
+  /// Ensures a valid X25519 key pair exists for this device AND the signed-in
+  /// user, and is registered in Supabase.
   Future<void> ensureDeviceKeys() async {
     await _crypto.init();
 
-    final storedPubKeyB64 = await _storage.read(key: _kPublicKeyStorageKey);
-    final storedPrivKeyB64 = await _storage.read(key: _kPrivateKeyStorageKey);
-    final storedDeviceId = await _storage.read(key: _kDeviceIdStorageKey);
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      clearInMemory();
+      throw StateError('User must be logged in to register device keys.');
+    }
 
-    if (storedPubKeyB64 != null && storedPrivKeyB64 != null && storedDeviceId != null) {
+    // Already loaded for this user in this session.
+    if (_userId == userId && _deviceId != null && _secretKey != null) return;
+    clearInMemory();
+
+    final names = DeviceKeyStorageNames.forUser(userId);
+    await _migrateLegacyKeysIfOwned(userId, names);
+
+    final storedPubKeyB64 = await _storage.read(key: names.publicKey);
+    final storedPrivKeyB64 = await _storage.read(key: names.privateKey);
+    final storedDeviceId = await _storage.read(key: names.deviceId);
+
+    if (storedPubKeyB64 != null &&
+        storedPrivKeyB64 != null &&
+        storedDeviceId != null) {
       _publicKey = base64Decode(storedPubKeyB64);
-      final privBytes = base64Decode(storedPrivKeyB64);
-      _secretKey = SecureKey.fromList(_crypto.sodium, privBytes);
+      _secretKey =
+          SecureKey.fromList(_crypto.sodium, base64Decode(storedPrivKeyB64));
       _deviceId = storedDeviceId;
+      _userId = userId;
       return;
     }
 
-    // Otherwise generate fresh X25519 keypair
+    // Otherwise generate a fresh X25519 keypair for this user on this device.
     final keypair = _crypto.generateDeviceKeyPair();
-    _publicKey = keypair.publicKey;
-    _secretKey = keypair.secretKey;
-
-    final pubKeyB64 = base64Encode(_publicKey!);
+    final pubKeyB64 = base64Encode(keypair.publicKey);
     final privKeyB64 = base64Encode(keypair.secretKey.extractBytes());
-
-    // Register with Supabase user_devices
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) {
-      throw StateError('User must be logged in to register device keys.');
-    }
 
     final platformStr =
         defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
@@ -80,11 +105,63 @@ class DeviceKeyManager {
         .select('id')
         .single();
 
-    _deviceId = insertRes['id'] as String;
+    final deviceId = insertRes['id'] as String;
 
-    // Persist securely
-    await _storage.write(key: _kPublicKeyStorageKey, value: pubKeyB64);
-    await _storage.write(key: _kPrivateKeyStorageKey, value: privKeyB64);
-    await _storage.write(key: _kDeviceIdStorageKey, value: _deviceId);
+    // Persist securely before using, so a crash can't leave a half state.
+    await _storage.write(key: names.publicKey, value: pubKeyB64);
+    await _storage.write(key: names.privateKey, value: privKeyB64);
+    await _storage.write(key: names.deviceId, value: deviceId);
+
+    _publicKey = keypair.publicKey;
+    _secretKey = keypair.secretKey;
+    _deviceId = deviceId;
+    _userId = userId;
+  }
+
+  /// Moves v1 (shared) keys into the current user's scope, but only if the
+  /// stored device row really belongs to this user. Otherwise the legacy keys
+  /// belonged to someone else and are deleted.
+  Future<void> _migrateLegacyKeysIfOwned(
+      String userId, DeviceKeyStorageNames names) async {
+    final legacyDeviceId = await _storage.read(key: _kLegacyDeviceId);
+    if (legacyDeviceId == null) return;
+
+    final legacyPub = await _storage.read(key: _kLegacyPublicKey);
+    final legacyPriv = await _storage.read(key: _kLegacyPrivateKey);
+
+    bool ownedByUser = false;
+    try {
+      final row = await _client
+          .from('user_devices')
+          .select('id')
+          .eq('id', legacyDeviceId)
+          .eq('user_id', userId)
+          .maybeSingle();
+      ownedByUser = row != null;
+    } catch (_) {
+      // Offline: leave legacy keys untouched and try again next time.
+      return;
+    }
+
+    if (ownedByUser && legacyPub != null && legacyPriv != null) {
+      await _storage.write(key: names.publicKey, value: legacyPub);
+      await _storage.write(key: names.privateKey, value: legacyPriv);
+      await _storage.write(key: names.deviceId, value: legacyDeviceId);
+    }
+
+    await _storage.delete(key: _kLegacyPublicKey);
+    await _storage.delete(key: _kLegacyPrivateKey);
+    await _storage.delete(key: _kLegacyDeviceId);
+  }
+
+  /// Forgets the keys held in memory (called on sign-out). The per-user keys
+  /// stay in secure storage so the same user can read their messages again
+  /// after signing back in; other users can never load them.
+  void clearInMemory() {
+    _userId = null;
+    _deviceId = null;
+    _publicKey = null;
+    _secretKey?.dispose();
+    _secretKey = null;
   }
 }

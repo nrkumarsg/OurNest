@@ -179,6 +179,17 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// Removes every locally cached (decrypted) message. Called on sign-out so
+  /// the next person to use this device can't read them (audit F11).
+  Future<void> clearAllMessages() async {
+    if (kIsWeb) {
+      _webMessages.clear();
+      _webChanges.add(null);
+      return;
+    }
+    await delete(localMessages).go();
+  }
+
   Future<void> updatePlaintext(String messageId, String newPlaintext) async {
     if (kIsWeb) {
       final existing = _webMessages[messageId];

@@ -189,13 +189,13 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
                                 AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : const Text('Sign In to OurNest (Instant)'),
+                      : const Text('Send Sign-In Code'),
                   onPressed: isLoading ? null : _submit,
                 ),
                 const SizedBox(height: 20),
                 Center(
                   child: Text(
-                    'v1.2.3 • Instant Sign-In • Closed family circle only',
+                    'v1.2.3 • Email code sign-in • Closed family circle only',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
