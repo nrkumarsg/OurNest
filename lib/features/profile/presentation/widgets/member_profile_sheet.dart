@@ -361,7 +361,7 @@ class MemberProfileSheet extends StatelessWidget {
                       icon: const Icon(Icons.chat_rounded, size: 18),
                       label: const Text('WhatsApp'),
                       onPressed: () => _openWhatsApp(
-                          profile?.whatsappNumber ?? profile!.phone!),
+                          profile.whatsappNumber ?? profile.phone!),
                     ),
                   if ((profile?.homeAddress != null &&
                           profile!.homeAddress!.isNotEmpty) ||
@@ -371,9 +371,9 @@ class MemberProfileSheet extends StatelessWidget {
                       icon: const Icon(Icons.map_rounded, size: 18),
                       label: const Text('Map Address'),
                       onPressed: () => _openAddressInMaps(
-                          profile?.homeAddress?.isNotEmpty == true
-                              ? profile!.homeAddress!
-                              : profile!.livingPlace!),
+                          profile.homeAddress?.isNotEmpty == true
+                              ? profile.homeAddress!
+                              : profile.livingPlace!),
                     ),
                 ],
               ),

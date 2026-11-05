@@ -510,4 +510,108 @@ flutter build web --release → √ Built build\web   (no .env in build/web/asse
 6. Two-phone tests: chat, push, shared alarm, invite link and QR, link request and approval, admin-leave rule.
 7. Release the new app (users with the old APK must reinstall once because of the new key), then do the Phase A steps (Confirm email ON, run the password reset script).
 
-*Phase E is not committed yet. The `coverage/` folder from the first test run is safe to delete.*
+Phase E was committed on `fix/audit-phase-a` (commit `0631517`). Not pushed.
+
+### Phase F – Quality (done 2026-11-05)
+
+| Finding | Status | What changed (simple words) | Files |
+|---|---|---|---|
+| F36 | ✅ Fixed | `flutter analyze` now reports **No issues found** (it started at 28). Removed unused imports and an unused field, fixed pointless `?.` / `!`, and switched the deprecated Supabase `anonKey` parameter to `publishableKey` (same value, same behaviour). | several files |
+| F38 | ✅ Fixed | Decrypted photos and voice notes are kept in a **40 MB least-recently-used cache** instead of growing forever. | `media_crypto_service.dart` |
+| F40 | ✅ Fixed (migration, not applied) | Devices record their real platform (`web`, `windows`, `macos`, `linux`, `ios`, `android`). Until migration `…000010` is applied, the app falls back to the old value, so device registration never breaks. | `device_key_manager.dart`, `supabase/migrations/20261105000010_device_platforms.sql` |
+| F30 | ✅ Rewritten (**not run, no local Supabase here**) | New `supabase/tests/security_rules_tests.sql` checks 9 rules as the **real signed-in role**, so Row Level Security actually applies: message isolation, outsider recipients, link approval, linked names vs private codes, one family per person, applicant visibility, invite-code limit, last-admin rule. It runs in one transaction that is **always rolled back**, and refuses to start without an explicit opt-in flag. The two old test files (which deleted data and ran as superuser) now refuse to run without that flag. | `supabase/tests/*.sql` |
+| F29 | ⏸ Blocked: needs a Flutter SDK upgrade (your machine) | `flutter pub upgrade` changes **nothing**: every package is already at the newest version that supports Flutter 3.24.5 / Dart 3.5.4. Newer packages, including a maintained replacement for the discontinued `sodium_libs` crypto library and a Kotlin 2 Android toolchain, need a newer Flutter. That changes the toolchain installed on your PC, so I didn't do it unasked. Plan below. | – |
+| F39 | ⏸ Deferred | `family_screen.dart` (~3,100 lines) is still large. Splitting it safely needs widget tests first; otherwise it's easy to break the UI without noticing. | – |
+| F37 | ⏸ Deferred | `replyToId` still stores the reply snippet. Changing it alters the encrypted message format, which older app versions read, so it's best done together with a version bump. | – |
+| (login text) | ✅ Fixed | The login screen still said "sign in immediately — no waiting for email codes" from the removed instant login. It now says a 6-digit code will be emailed. | `phone_input_screen.dart` |
+| **F44 (new)** | ❌ Open | **Sharing into OurNest isn't wired up.** Android lists OurNest as a share target (text and images) and the Help guide says the chat "opens with the link pre-filled", but the app has no code to receive shared content, so it just opens. Fix: add a share-receiving package and handler, **or** remove the share intent filters and that Help card. *(Medium, UI promise not kept.)* | `AndroidManifest.xml`, `help_guide_screen.dart` |
+
+**Flutter / dependency upgrade plan (when you're ready):**
+1. Run `flutter upgrade` on this PC (to the current stable).
+2. Run `flutter pub upgrade --major-versions`, then fix the breaking changes (expected in go_router, flutter_riverpod, drift, flutter_local_notifications, record, mobile_scanner).
+3. Replace `sodium_libs` with the maintained package and **add a real encrypt → decrypt round-trip test** before releasing; this is the encryption layer.
+4. Upgrade the Android Gradle plugin and Kotlin to what the new Flutter recommends (Kotlin 2.x). This also unblocks `package_info_plus` for the version label.
+5. Re-run all tests and all builds, then test on real phones.
+
+**Checks after Phase F (actual results):**
+```
+flutter analyze  → No issues found!
+flutter test --coverage → 00:16 +119: All tests passed!   (110 + 9 new in test/unit/quality_phase_f_test.dart)
+                          lines covered in loaded files: 536 / 2544 (21.1%)
+flutter build apk --debug   → √ Built build\app\outputs\flutter-apk\app-debug.apk
+flutter build web --release → √ Built build\web
+```
+
+---
+
+## 10. Final user-flow walkthrough
+
+How each flow was checked:
+- **PASS (browser):** clicked through the real web build (signed out only; I didn't create accounts on your production database).
+- **PASS (code + tests):** the code path was re-read end to end and is covered by automated tests, but it still needs a run on real phones after the migrations are applied.
+- **BLOCKED:** needs a setup step from you first.
+- **FAIL:** known not to work.
+
+| # | Role | Flow | Result | Notes |
+|---|---|---|---|---|
+| 1 | Guest | Open app → login screen; protected pages redirect to login; invalid email rejected | **PASS (browser)** | `/settings` and unknown pages went to `/phone-login`; "not-an-email" showed "Please enter a valid email address". |
+| 2 | Guest | Email code sign-in (send code → enter code / magic link) | PASS (code + tests) | No password path any more (F01). Not sent for real, because it would email a real account. |
+| 3 | New user | Profile setup and edit | PASS (code + tests) | Real errors, e.g. duplicate phone (F10). |
+| 4 | New user | Create family → becomes admin | PASS (code + tests) | Unchanged RPC. |
+| 5 | New user | Join by code, QR or invite link (also when signed out first) | PASS (code + tests) | Needs migration 9; deep link needs an Android phone test. A second family is refused (Q1). |
+| 6 | Admin | See applicant's name → approve | PASS (code + tests) | Needs migration 8 (F17). |
+| 7 | Member | Family chat: live delivery, catch-up after offline, web reload restores history | PASS (code + tests) | Needs migrations 5 and 6 plus a **two-device test** (F02/F03). |
+| 8 | Member | Private message to one member; "selected" group message | PASS (code + tests) | F22 thread rules tested. |
+| 9 | Member | Photo / voice note send and view | PASS (code + tests) | Errors now shown (F23); cache limited (F38). |
+| 10 | Member | Send fails (offline) | PASS (code + tests) | Text restored and error shown (F23). |
+| 11 | Member | Shared alarm → escalation on other phones → "I'm awake" cancels | PASS (code + tests) | Needs real phones (locked-screen ringing). |
+| 12 | Member | Push notification while app closed | **BLOCKED** | Needs Firebase setup (`supabase/manual/PUSH_SETUP.md`) plus migration 7. |
+| 13 | Member | Reminder → "Remind Me on This Phone" | PASS (code + tests) | Real scheduled notification (F09). |
+| 14 | Admin | Link another family → other admin approves; Peace Pause / Silent Curtain; unlink | PASS (code + tests) | Real results, confirmation on unlink (F07/U19/F12/F32). |
+| 15 | Admin | Broadcast / Family-to-Family post | PASS (honest) | Posts to own family chat and says so. Real cross-family delivery isn't built (decision Q2). |
+| 16 | Admin | Rename, remove member, transfer admin, new invite code | PASS (code + tests) | New code invalidates old QR (F20). |
+| 17 | Admin | Leave family as the only admin | PASS (code + tests) | Blocked with a clear message until admin is transferred (Q4). |
+| 18 | Any | Settings: permission status, version, sign-out wipes this phone | PASS (code + tests) | F35, F11. |
+| 19 | Any | Windows desktop launcher | PASS (code + tests) | No LAN IP; explains PWA install without Python. |
+| 20 | Any | Share a link or photo from another app into OurNest | **FAIL** | Not wired (F44). |
+
+---
+
+## 11. Summary of all changes
+
+Branch `fix/audit-phase-a`, **not pushed**:
+
+| Commit | Phase | In one line |
+|---|---|---|
+| `0bf8265` | A – Security | Email-code-only login, per-user keys + wipe on sign-out, lock-screen fix, RLS hardening |
+| `d396b2a` | B – Chat | Atomic send, catch-up sync, correct private/group threads, visible send errors, batched receipts |
+| `a0cbd67` | C – Alarms & push | Alarm receivers, cross-device escalation and "I'm awake", Firebase push, FCM v1 function and trigger |
+| `e728676` | D – Honest UI | Real results instead of fake success, real reminders, profile errors, applicant names |
+| `0631517` | E – Release | Signing guard, sign-in guard + invite links, no bundled .env, invite limits, private realtime, Q1/Q4 rules |
+| *(this phase)* | F – Quality | Zero analyzer issues, media cache limit, real platforms, safe RLS tests |
+
+**Numbers, before → after:**
+- Analyzer: 28 issues → **0**.
+- Tests: 29 (models only) → **119**.
+- Database migrations added: **6** (`…000005` to `…000010`), none applied yet.
+- Findings: 44 total (43 from the audit + F44).
+  - **Fixed in code:** 34.
+  - **Made honest; real feature is a decision:** F08.
+  - **Blocked on your setup:** F04 (push needs Firebase) and F29 (needs a Flutter SDK upgrade).
+  - **Deferred:** F37, F39, F42.
+  - **Open:** F44.
+  - **Covered by other fixes:** F03 needs the two-device check; F31 is partly addressed through `friendlyError` and logging, but there's no crash-reporting service (that would be a third-party choice for you).
+
+**Updated health score: about 6.5 / 10 in code.** It rises to roughly 7.5 once the migrations are applied and the two-phone tests pass. The biggest remaining risks are: (1) the password reset script and "Confirm email" not done yet, so the old login hole stays open on the live server; (2) nothing verified on real devices yet; (3) the old Flutter SDK and the discontinued crypto library.
+
+### Final owner checklist (in order)
+1. Apply migrations `…000005` → `…000010` (staging first, then production).
+2. Supabase → Realtime → Settings → turn off "Allow public access".
+3. Create the release signing key plus `android/key.properties` and back them up.
+4. Optional: push setup (`supabase/manual/PUSH_SETUP.md`).
+5. Rebuild `landing/app` and the Windows zip; publish the new APK (old installs must reinstall once).
+6. **Then** Supabase → Auth → Email → turn ON "Confirm email", and run `supabase/manual/2026-11-05_reset_derived_passwords.sql`.
+7. Two-phone test of flows 5–17 above.
+8. Later: the Flutter upgrade plan, and a decision on F44 (build share-into-OurNest or remove the promise).
+
+*The `coverage/` folder (from the test runs) and `.claude/launch.json` (local web preview) are safe to delete.*

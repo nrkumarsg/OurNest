@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,7 +20,6 @@ class _VoiceRecorderSheetState extends State<VoiceRecorderSheet> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   Timer? _timer;
   int _seconds = 0;
-  bool _isRecording = false;
   String? _filePath;
 
   @override
@@ -48,8 +46,6 @@ class _VoiceRecorderSheetState extends State<VoiceRecorderSheet> {
       const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000),
       path: _filePath!,
     );
-
-    setState(() => _isRecording = true);
 
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (mounted) {

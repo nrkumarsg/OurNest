@@ -2174,8 +2174,8 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                                 spacing: 10,
                                 runSpacing: 2,
                                 children: [
-                                  if (p?.livingPlace != null &&
-                                      p!.livingPlace!.isNotEmpty)
+                                  if (p.livingPlace != null &&
+                                      p.livingPlace!.isNotEmpty)
                                     Text(
                                       '📍 ${p.livingPlace!}',
                                       style: GoogleFonts.nunito(
@@ -2184,8 +2184,8 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
                                         color: AppColors.textSecondaryLight,
                                       ),
                                     ),
-                                  if (p?.workingPlace != null &&
-                                      p!.workingPlace!.isNotEmpty)
+                                  if (p.workingPlace != null &&
+                                      p.workingPlace!.isNotEmpty)
                                     Text(
                                       '🏢 ${p.occupation != null && p.occupation!.isNotEmpty ? "${p.occupation} @ " : ""}${p.workingPlace!}',
                                       style: GoogleFonts.nunito(

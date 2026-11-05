@@ -1,3 +1,15 @@
+-- ⚠️ AUDIT F30: this older file DELETES rows and runs as the superuser, so
+-- Row Level Security is NOT applied and these checks can pass even when the
+-- rules are wrong. Prefer supabase/tests/security_rules_tests.sql.
+-- It now refuses to run unless explicitly allowed on a LOCAL database:
+--   PGOPTIONS="-c ournest.allow_test_data=on" psql ... -f <this file>
+do $$
+begin
+  if coalesce(current_setting('ournest.allow_test_data', true), '') <> 'on' then
+    raise exception 'Refusing to run: this test deletes data. Use a LOCAL Supabase with PGOPTIONS="-c ournest.allow_test_data=on".';
+  end if;
+end $$;
+
 -- Test Suite: family_rls_tests.sql
 -- Description: Tests RLS policies for families, family_members, and cross-family data isolation
 

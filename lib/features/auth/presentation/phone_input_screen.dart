@@ -136,7 +136,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Enter your email address to sign in immediately — no waiting for email codes.',
+                  'Enter your email address. We will send you a 6-digit sign-in code.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondaryLight,
                       ),

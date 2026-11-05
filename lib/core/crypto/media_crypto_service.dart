@@ -39,7 +39,9 @@ class EncryptedMediaResult {
 class MediaCryptoService {
   final CryptoService _crypto;
   final SupabaseClient _client;
-  final Map<String, Uint8List> _decryptedCache = {};
+  /// Decrypted photos / voice notes kept in memory, newest last (LRU).
+  /// Audit F38: this used to grow forever while scrolling through media.
+  final DecryptedMediaCache _decryptedCache = DecryptedMediaCache();
 
   MediaCryptoService(this._crypto, this._client);
 
@@ -77,7 +79,7 @@ class MediaCryptoService {
           fileOptions: const FileOptions(contentType: 'application/octet-stream'),
         );
 
-    _decryptedCache[storagePath] = rawBytes;
+    _decryptedCache.put(storagePath, rawBytes);
 
     return EncryptedMediaResult(
       storagePath: storagePath,
@@ -95,9 +97,8 @@ class MediaCryptoService {
     required String fileNonceBase64,
     required String fileExtension,
   }) async {
-    if (_decryptedCache.containsKey(storagePath)) {
-      return _decryptedCache[storagePath]!;
-    }
+    final cached = _decryptedCache.get(storagePath);
+    if (cached != null) return cached;
 
     await _crypto.init();
 
@@ -117,7 +118,46 @@ class MediaCryptoService {
     );
 
     final bytes = Uint8List.fromList(decrypted);
-    _decryptedCache[storagePath] = bytes;
+    _decryptedCache.put(storagePath, bytes);
     return bytes;
+  }
+}
+
+/// Small least-recently-used cache limited by total bytes.
+class DecryptedMediaCache {
+  /// ~40 MB is plenty for a chat screen's worth of photos and voice notes.
+  static const defaultMaxBytes = 40 * 1024 * 1024;
+
+  final int maxBytes;
+  final _entries = <String, Uint8List>{}; // insertion order = recency
+  int _totalBytes = 0;
+
+  DecryptedMediaCache({this.maxBytes = defaultMaxBytes});
+
+  int get totalBytes => _totalBytes;
+  int get length => _entries.length;
+
+  Uint8List? get(String key) {
+    final value = _entries.remove(key);
+    if (value != null) _entries[key] = value; // mark as most recent
+    return value;
+  }
+
+  void put(String key, Uint8List value) {
+    final old = _entries.remove(key);
+    if (old != null) _totalBytes -= old.length;
+    // A single item bigger than the whole budget is simply not cached.
+    if (value.length > maxBytes) return;
+    _entries[key] = value;
+    _totalBytes += value.length;
+    while (_totalBytes > maxBytes && _entries.isNotEmpty) {
+      final oldestKey = _entries.keys.first;
+      _totalBytes -= _entries.remove(oldestKey)!.length;
+    }
+  }
+
+  void clear() {
+    _entries.clear();
+    _totalBytes = 0;
   }
 }

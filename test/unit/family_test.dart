@@ -80,7 +80,7 @@ void main() {
     });
 
     test('Invite codes conform to 6-character unambiguous pattern', () {
-      final validCode = 'SHRM92';
+      const validCode = 'SHRM92';
       expect(validCode.length, equals(6));
       expect(validCode, matches(RegExp(r'^[A-Z0-9]{6}$')));
     });

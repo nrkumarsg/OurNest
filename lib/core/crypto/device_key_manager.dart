@@ -92,20 +92,7 @@ class DeviceKeyManager {
     final pubKeyB64 = base64Encode(keypair.publicKey);
     final privKeyB64 = base64Encode(keypair.secretKey.extractBytes());
 
-    final platformStr =
-        defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
-
-    final insertRes = await _client
-        .from('user_devices')
-        .insert({
-          'user_id': userId,
-          'public_key': pubKeyB64,
-          'platform': platformStr,
-        })
-        .select('id')
-        .single();
-
-    final deviceId = insertRes['id'] as String;
+    final deviceId = await _registerDevice(userId, pubKeyB64);
 
     // Persist securely before using, so a crash can't leave a half state.
     await _storage.write(key: names.publicKey, value: pubKeyB64);
@@ -116,6 +103,53 @@ class DeviceKeyManager {
     _secretKey = keypair.secretKey;
     _deviceId = deviceId;
     _userId = userId;
+  }
+
+  /// The real platform (audit F40: web, Windows, macOS and Linux used to be
+  /// recorded as 'android').
+  @visibleForTesting
+  static String platformName({required bool isWeb, required TargetPlatform platform}) {
+    if (isWeb) return 'web';
+    switch (platform) {
+      case TargetPlatform.iOS:
+        return 'ios';
+      case TargetPlatform.windows:
+        return 'windows';
+      case TargetPlatform.macOS:
+        return 'macos';
+      case TargetPlatform.linux:
+        return 'linux';
+      default:
+        return 'android';
+    }
+  }
+
+  Future<String> _registerDevice(String userId, String pubKeyB64) async {
+    Future<String> insert(String platform) async {
+      final res = await _client
+          .from('user_devices')
+          .insert({
+            'user_id': userId,
+            'public_key': pubKeyB64,
+            'platform': platform,
+          })
+          .select('id')
+          .single();
+      return res['id'] as String;
+    }
+
+    final platform =
+        platformName(isWeb: kIsWeb, platform: defaultTargetPlatform);
+    try {
+      return await insert(platform);
+    } on PostgrestException catch (e) {
+      // Migration 20261105000010 not applied yet: the old check constraint
+      // only allows android/ios. Register anyway rather than break chat.
+      if (e.code == '23514' && platform != 'android' && platform != 'ios') {
+        return insert('android');
+      }
+      rethrow;
+    }
   }
 
   /// Moves v1 (shared) keys into the current user's scope, but only if the

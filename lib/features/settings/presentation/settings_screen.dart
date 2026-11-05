@@ -202,11 +202,11 @@ class SettingsScreen extends ConsumerWidget {
             Card(
               child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.security_rounded, color: AppColors.primaryTeal),
-                    title: const Text('End-to-End Encryption'),
-                    subtitle: const Text('Active (X25519 & XChaCha20-Poly1305)'),
-                    trailing: const Icon(Icons.check_circle_rounded, color: AppColors.success),
+                  const ListTile(
+                    leading: Icon(Icons.security_rounded, color: AppColors.primaryTeal),
+                    title: Text('End-to-End Encryption'),
+                    subtitle: Text('Active (X25519 & XChaCha20-Poly1305)'),
+                    trailing: Icon(Icons.check_circle_rounded, color: AppColors.success),
                   ),
                   const Divider(height: 1),
                   Builder(builder: (context) {
