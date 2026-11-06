@@ -40,6 +40,41 @@ class ProfileRepository {
           .single();
       return Profile.fromJson(response);
     } on PostgrestException catch (e) {
+      // If extended columns from migration 20261103000004 are not yet applied
+      // on the live Supabase schema cache (PGRST204 / 42703), save via core
+      // columns + ournest_meta so real data is persisted in public.profiles.
+      if (e.code == 'PGRST204' || e.code == '42703') {
+        try {
+          final fallbackRes = await _client
+              .from('profiles')
+              .upsert(profile.toFallbackCoreJson(includePhoneColumn: true))
+              .select()
+              .single();
+          return Profile.fromJson(fallbackRes);
+        } on PostgrestException catch (e2) {
+          if (e2.code == '23505') {
+            final noPhoneRes = await _client
+                .from('profiles')
+                .upsert(profile.toFallbackCoreJson(includePhoneColumn: false))
+                .select()
+                .single();
+            return Profile.fromJson(noPhoneRes);
+          }
+          throw StateError(friendlyProfileError(e2.code, e2.message));
+        }
+      }
+      if (e.code == '23505') {
+        try {
+          final noPhoneRes = await _client
+              .from('profiles')
+              .upsert(profile.toFallbackCoreJson(includePhoneColumn: false))
+              .select()
+              .single();
+          return Profile.fromJson(noPhoneRes);
+        } on PostgrestException catch (e2) {
+          throw StateError(friendlyProfileError(e2.code, e2.message));
+        }
+      }
       throw StateError(friendlyProfileError(e.code, e.message));
     }
   }
