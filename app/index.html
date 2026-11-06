@@ -1,7 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <base href="/app/">
+  <script>
+    (function() {
+      var p = window.location.pathname;
+      var base = p.indexOf('/OurNest/app') === 0 ? '/OurNest/app/' : '/app/';
+      document.write('<base href="' + base + '">');
+    })();
+  </script>
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
