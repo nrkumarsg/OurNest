@@ -1,13 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../family/domain/family_member_model.dart';
+import '../../../family/presentation/family_controller.dart';
 import '../../domain/profile_model.dart';
 
-class MemberProfileSheet extends StatelessWidget {
+class MemberProfileSheet extends ConsumerWidget {
   final FamilyMember member;
   final bool isSelf;
   final String? familyBranchName;
@@ -68,8 +70,21 @@ class MemberProfileSheet extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final profile = member.profile;
+    final adminProfile = ref
+        .watch(activeMembersProvider)
+        .where((m) => m.isAdmin && m.profile != null)
+        .map((m) => m.profile!)
+        .firstOrNull;
+    final effectiveCity = (profile?.livingPlace?.isNotEmpty == true)
+        ? profile!.livingPlace!
+        : (profile?.city?.isNotEmpty == true
+            ? profile!.city!
+            : (adminProfile?.livingPlace ?? adminProfile?.city ?? ''));
+    final effectiveAddress = (profile?.homeAddress?.isNotEmpty == true)
+        ? profile!.homeAddress!
+        : (adminProfile?.homeAddress ?? '');
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final secondaryColor = Theme.of(context).brightness == Brightness.dark
         ? AppColors.textSecondaryDark
@@ -256,14 +271,14 @@ class MemberProfileSheet extends StatelessWidget {
             _buildDetailTile(
               icon: Icons.location_city_rounded,
               label: 'Living Place / Residence City',
-              value: profile?.livingPlace ?? profile?.city ?? '',
+              value: effectiveCity,
               onSurface: onSurface,
               secondaryColor: secondaryColor,
             ),
             _buildDetailTile(
               icon: Icons.home_rounded,
               label: 'Home / Residential Address',
-              value: profile?.homeAddress ?? '',
+              value: effectiveAddress,
               onSurface: onSurface,
               secondaryColor: secondaryColor,
             ),

@@ -79,6 +79,12 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   void _populateExistingProfile() {
     if (_initializedFromExisting) return;
     final existing = ref.read(currentProfileProvider).value;
+    final activeMembers = ref.read(activeMembersProvider);
+    final adminProfile = activeMembers
+        .where((m) => m.isAdmin && m.profile != null)
+        .map((m) => m.profile!)
+        .firstOrNull;
+
     if (existing != null) {
       _initializedFromExisting = true;
       _nameController.text = existing.displayName;
@@ -89,8 +95,16 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
           existing.phone?.isNotEmpty == true);
       _statusController.text =
           existing.statusText ?? 'Available for family ❤️';
-      _livingPlaceController.text = existing.livingPlace ?? existing.city ?? '';
-      _homeAddressController.text = existing.homeAddress ?? '';
+      final inheritedCity = existing.livingPlace?.isNotEmpty == true
+          ? existing.livingPlace!
+          : (existing.city?.isNotEmpty == true
+              ? existing.city!
+              : (adminProfile?.livingPlace ?? adminProfile?.city ?? ''));
+      final inheritedAddress = existing.homeAddress?.isNotEmpty == true
+          ? existing.homeAddress!
+          : (adminProfile?.homeAddress ?? '');
+      _livingPlaceController.text = inheritedCity;
+      _homeAddressController.text = inheritedAddress;
       _educationController.text = existing.education ?? '';
       _occupationController.text = existing.occupation ?? '';
       _workingPlaceController.text = existing.workingPlace ?? '';
@@ -100,7 +114,49 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       _selectedBloodGroup = existing.bloodGroup;
       _selectedDob = existing.dateOfBirth;
       _avatarBase64DataUri = existing.avatarUrl;
+    } else if (adminProfile != null) {
+      // Pre-fill household city & address from Family Admin for new members
+      if (_livingPlaceController.text.isEmpty) {
+        _livingPlaceController.text =
+            adminProfile.livingPlace ?? adminProfile.city ?? '';
+      }
+      if (_homeAddressController.text.isEmpty) {
+        _homeAddressController.text = adminProfile.homeAddress ?? '';
+      }
     }
+  }
+
+  void _copyHouseholdInfoFromAdmin() {
+    final activeMembers = ref.read(activeMembersProvider);
+    final adminMember = activeMembers
+        .where((m) => m.isAdmin && m.profile != null)
+        .firstOrNull;
+    final adminProfile = adminMember?.profile;
+    if (adminProfile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Once you join a Family Circle, your Admin\'s City & Home Address will copy automatically!'),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      if ((adminProfile.livingPlace ?? adminProfile.city)?.isNotEmpty == true) {
+        _livingPlaceController.text =
+            adminProfile.livingPlace ?? adminProfile.city ?? '';
+      }
+      if (adminProfile.homeAddress?.isNotEmpty == true) {
+        _homeAddressController.text = adminProfile.homeAddress!;
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            '🏠 Copied City & Home Address from ${adminMember!.displayName} (Admin)!'),
+        backgroundColor: AppColors.success,
+      ),
+    );
   }
 
   Future<void> _pickAvatarImage() async {
@@ -536,6 +592,23 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 // Section 2: Living Place, Home Address, Education & Work Details
                 _buildSectionHeader(
                     context, '2. Living Place, Home Address, Education & Work'),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ActionChip(
+                    avatar: const Icon(Icons.home_work_rounded,
+                        size: 18, color: AppColors.primaryTeal),
+                    label: Text(
+                      '🏠 Same City & Home Address as Family Admin (1-Tap Copy)',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: onSurface,
+                      ),
+                    ),
+                    onPressed: _copyHouseholdInfoFromAdmin,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _livingPlaceController,
