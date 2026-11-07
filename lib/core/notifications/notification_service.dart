@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,8 +14,8 @@ import '../network/supabase_client.dart';
 class LocalNotifications {
   LocalNotifications._();
 
-  static const messageChannelId = 'ournest_family_alerts_v1';
-  static const messageChannelName = 'OurNest Messages & Alarms';
+  static const messageChannelId = 'ournest_family_alerts_v2';
+  static const messageChannelName = 'OurNest Messages & Badges';
 
   static final FlutterLocalNotificationsPlugin plugin =
       FlutterLocalNotificationsPlugin();
@@ -68,9 +69,11 @@ class LocalNotifications {
             const AndroidNotificationChannel(
               messageChannelId,
               messageChannelName,
-              description: 'Family messages and wake-up alerts',
-              importance: Importance.high,
+              description: 'Family messages, unread icon badges and wake-up alerts',
+              importance: Importance.max,
               enableVibration: true,
+              playSound: true,
+              showBadge: true,
             ),
           );
       _ready = true;
@@ -104,6 +107,8 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 
 class NotificationService {
   final SupabaseClient _client;
+  static const MethodChannel _badgeChannel =
+      MethodChannel('com.ournest.app/alarm_buzzer');
 
   NotificationService(this._client);
 
@@ -120,30 +125,48 @@ class NotificationService {
     }).eq('id', deviceId);
   }
 
-  /// Shows a privacy-safe message notification (sender name only, never content).
+  /// Updates the Android home screen launcher unread badge count `(1)`, `(2)`, etc.
+  static Future<void> updateLauncherBadge(int count) async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _badgeChannel.invokeMethod('updateBadge', {'count': count});
+      } catch (_) {}
+    }
+  }
+
+  /// Shows a privacy-safe message notification (sender name only, never content)
+  /// and sets the Android home-screen app icon badge count.
   static Future<void> showMessageNotification({
     required int id,
     required String title,
     required String body,
     String? payload,
+    int badgeCount = 1,
   }) async {
+    await updateLauncherBadge(badgeCount);
     if (!LocalNotifications.isSupported) return;
-    await LocalNotifications.ensureInitialized();
+    await LocalNotifications.ensureInitialized(requestPermission: true);
     await LocalNotifications.plugin.show(
       id,
       title,
       body,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           LocalNotifications.messageChannelId,
           LocalNotifications.messageChannelName,
-          importance: Importance.high,
+          importance: Importance.max,
           priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          channelShowBadge: true,
+          number: badgeCount,
+          category: AndroidNotificationCategory.message,
         ),
         iOS: DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
+          badgeNumber: badgeCount,
         ),
       ),
       payload: payload,

@@ -97,6 +97,26 @@ extension _FamilyScreenTabs on _FamilyScreenState {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accentCoralDark,
+                          side: const BorderSide(color: AppColors.accentCoral),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                        ),
+                        icon: const Icon(Icons.groups_2_rounded, size: 20),
+                        label: const Text(
+                            '✨ Custom Groups, ✈️ Tour Group & Share Admin'),
+                        onPressed: () => CustomGroupSheet.show(
+                          context,
+                          family: fam,
+                          currentMembership: membership,
+                          activeMembers: activeMembers,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -232,6 +252,13 @@ extension _FamilyScreenTabs on _FamilyScreenState {
             final isSelf = member.userId == membership.userId;
             final p = member.profile;
             final avatarBytes = _decodeAvatar(p?.avatarUrl);
+            final onlineIds = ref.watch(onlineUserIdsProvider);
+            final lastSeenMap = ref.watch(lastSeenByUserProvider);
+            final isMemberOnline = onlineIds.contains(member.userId);
+            final seenStatus = formatLastSeen(
+              lastSeenMap[member.userId] ?? member.createdAt,
+              isOnline: isMemberOnline,
+            );
 
             return Card(
               margin: const EdgeInsets.only(bottom: 10),
@@ -347,9 +374,9 @@ extension _FamilyScreenTabs on _FamilyScreenState {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              member.formattedRelation,
+                              '${member.formattedRelation} • $seenStatus',
                               style: GoogleFonts.nunito(
-                                fontSize: 13.5,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.primaryTeal,
                               ),
@@ -420,6 +447,26 @@ extension _FamilyScreenTabs on _FamilyScreenState {
                               _showEditRelationSheet(context, ref, member);
                             } else if (action == 'remove') {
                               _confirmRemoveMember(context, ref, member);
+                            } else if (action == 'toggle_co_admin') {
+                              final makeAdmin = !member.isAdmin;
+                              ref
+                                  .read(familyControllerProvider.notifier)
+                                  .setMemberAdminRole(
+                                    familyId: member.familyId,
+                                    targetUserId: member.userId,
+                                    makeAdmin: makeAdmin,
+                                  )
+                                  .then((ok) {
+                                if (!context.mounted) return;
+                                showFamilyActionResult(
+                                  context,
+                                  ref,
+                                  ok: ok,
+                                  success: makeAdmin
+                                      ? '👑 Shared Admin rights granted to ${member.displayName}!'
+                                      : 'Removed Shared Admin rights from ${member.displayName}.',
+                                );
+                              });
                             } else if (action == 'transfer') {
                               ref
                                   .read(familyControllerProvider.notifier)
@@ -450,13 +497,26 @@ extension _FamilyScreenTabs on _FamilyScreenState {
                                 ],
                               ),
                             ),
+                            PopupMenuItem(
+                              value: 'toggle_co_admin',
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.workspace_premium_rounded,
+                                      size: 20, color: AppColors.accentCoral),
+                                  const SizedBox(width: 8),
+                                  Text(member.isAdmin
+                                      ? 'Remove Shared Admin'
+                                      : 'Share Admin (Co-Admin)'),
+                                ],
+                              ),
+                            ),
                             const PopupMenuItem(
                               value: 'transfer',
                               child: Row(
                                 children: [
                                   Icon(Icons.stars_rounded, size: 20),
                                   SizedBox(width: 8),
-                                  Text('Make Admin'),
+                                  Text('Transfer Sole Admin'),
                                 ],
                               ),
                             ),

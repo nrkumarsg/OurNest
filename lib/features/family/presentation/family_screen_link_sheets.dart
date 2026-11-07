@@ -24,6 +24,8 @@ extension _FamilyLinkSheets on _FamilyScreenState {
 
     const friendPresets = [
       "Close Family Friends",
+      "Tour Group / Travel Companions",
+      "Custom Group / Special Circle",
       "Childhood Friend's Family",
       "Next-Door Neighbour Family",
       "Colleague's Family",
@@ -31,6 +33,8 @@ extension _FamilyLinkSheets on _FamilyScreenState {
     ];
 
     const communityPresets = [
+      "Tour Group / Holiday Travel Circle",
+      "Custom Community Group",
       "Temple Volunteers / Seva Group",
       "Church Fellowship / Parish Group",
       "Mosque / Prayer Community",
@@ -390,6 +394,8 @@ extension _FamilyLinkSheets on _FamilyScreenState {
     final msgCtrl = TextEditingController();
 
     const customCircles = [
+      '✈️ Tour Group & Travel Companions',
+      '✨ Custom Group Circle',
       '⛪ Sunday Church Fellowship',
       '🛕 Temple Seva & Festival Volunteers',
       '👨‍👩‍👧‍👦 Close Blood Relatives',
@@ -397,6 +403,8 @@ extension _FamilyLinkSheets on _FamilyScreenState {
     ];
 
     const broadcastTemplates = [
+      '✈️ Tour Group Update: Everyone please check today\'s tour itinerary and meet at the lobby 15 mins early! Reply 👍 when ready.',
+      '✨ Custom Group Announcement: Important update for all members of our custom group!',
       '🛕 Temple Seva Call: 🙏 Namaskaram! Reminder for tomorrow\'s Temple Seva & volunteer duty. Please reply 👍 to confirm your slot.',
       '⛪ Church Fellowship: ✝️ Praise the Lord! Reminder for our Sunday Parish Fellowship & Choir practice this week.',
       '🤲 Volunteer Roster Update: Please check your assigned volunteer timing and reach 15 mins early.',

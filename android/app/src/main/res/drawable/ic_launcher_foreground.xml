@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Soft inner cream circle -->
+    <path
+        android:fillColor="#FAF8F5"
+        android:pathData="M54,54m-33,0a33,33 0,1 1,66 0a33,33 0,1 1,-66 0" />
+    <!-- Left Parent Head (Teal) -->
+    <path
+        android:fillColor="#1F5C57"
+        android:pathData="M42,43m-6.5,0a6.5,6.5 0,1 1,13 0a6.5,6.5 0,1 1,-13 0" />
+    <!-- Left Parent Body (Teal) -->
+    <path
+        android:fillColor="#1F5C57"
+        android:pathData="M35,56a7,8.5 0,1 0,14 0a7,8.5 0,1 0,-14 0" />
+    <!-- Right Parent Head (Teal) -->
+    <path
+        android:fillColor="#1F5C57"
+        android:pathData="M66,43m-6.5,0a6.5,6.5 0,1 1,13 0a6.5,6.5 0,1 1,-13 0" />
+    <!-- Right Parent Body (Teal) -->
+    <path
+        android:fillColor="#1F5C57"
+        android:pathData="M59,56a7,8.5 0,1 0,14 0a7,8.5 0,1 0,-14 0" />
+    <!-- Center Child Head (Warm Coral) -->
+    <path
+        android:fillColor="#E07A5F"
+        android:pathData="M54,47m-5.2,0a5.2,5.2 0,1 1,10.4 0a5.2,5.2 0,1 1,-10.4 0" />
+    <!-- Center Child Body (Warm Coral) -->
+    <path
+        android:fillColor="#E07A5F"
+        android:pathData="M48.5,58a5.5,6.5 0,1 0,11 0a5.5,6.5 0,1 0,-11 0" />
+    <!-- Nest Bowl (Deep Teal Stroke) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#143D3A"
+        android:strokeWidth="4.8"
+        android:strokeLineCap="round"
+        android:pathData="M31,59 C34,76 74,76 77,59" />
+    <!-- Nest Rim (Teal Stroke) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#1F5C57"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:pathData="M29,59 Q54,62 79,59" />
+</vector>
+

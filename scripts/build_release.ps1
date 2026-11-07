@@ -40,10 +40,21 @@ if ($DefineFile -ne "") {
 Step "Checks: analyze" { flutter analyze }
 Step "Checks: tests"   { flutter test }
 
-# 1. Web app served by the site at /app/
+# 1. Web app served by the site at /app/ (and /OurNest/app/ on GitHub Pages)
 Step "Web app (/app/)" { flutter build web --release --base-href /app/ @defines }
 if (Test-Path landing/app) { Remove-Item landing/app -Recurse -Force }
 Copy-Item build/web landing/app -Recurse
+$appIndex = Get-Content landing/app/index.html -Raw
+$dynamicBase = @'
+  <script>
+    (function() {
+      var base = window.location.pathname.indexOf('/OurNest/app') === 0 ? '/OurNest/app/' : '/app/';
+      document.write('<base href="' + base + '">');
+    })();
+  </script>
+'@
+Set-Content landing/app/index.html -Value ($appIndex.Replace('  <base href="/app/">', $dynamicBase)) -NoNewline
+Set-Content landing/.nojekyll -Value "" -NoNewline
 
 # 2. Windows desktop zip (served from the PC itself at /)
 Step "Web app for desktop zip (/)" { flutter build web --release --base-href / @defines }

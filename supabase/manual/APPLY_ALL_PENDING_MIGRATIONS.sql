@@ -611,3 +611,4 @@ alter table public.user_devices
 alter table public.user_devices
   add constraint user_devices_platform_check
   check (platform in ('android', 'ios', 'web', 'windows', 'macos', 'linux'));
+

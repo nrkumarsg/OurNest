@@ -58,7 +58,9 @@ class FamilyLink {
         lower.contains('parish') ||
         lower.contains('fellowship') ||
         lower.contains('charity') ||
-        lower.contains('welfare');
+        lower.contains('welfare') ||
+        lower.contains('tour') ||
+        lower.contains('custom');
   }
 
   bool get isFriendFamily {
@@ -78,6 +80,9 @@ class FamilyLink {
   }
 
   String get ringEmoji {
+    final lower = branchLabel.toLowerCase();
+    if (lower.contains('tour')) return '✈️';
+    if (lower.contains('custom')) return '✨';
     if (isCommunityGroup) return '🛕⛪';
     if (isFriendFamily) return '🤝';
     return '🌳';

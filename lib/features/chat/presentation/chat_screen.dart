@@ -42,16 +42,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     _isDirect = widget.threadId != 'family';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(activeOpenThreadProvider.notifier).state = widget.threadId;
+      ref.read(chatRepositoryProvider).markThreadRead(widget.threadId);
+      if (_isDirect) {
+        ref.read(audienceStateProvider.notifier).setSelected([_directMemberId!]);
+      } else {
+        _consumePendingShare();
+      }
+    });
     if (_isDirect) {
       _directMemberId = widget.threadId;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(audienceStateProvider.notifier).setSelected([_directMemberId!]);
-      });
-    }
-
-    // Shared from another app (F44): pre-fill text / offer to send photos.
-    if (!_isDirect) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _consumePendingShare());
     }
 
     _textController.addListener(() {
@@ -68,6 +70,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    try {
+      ref.read(activeOpenThreadProvider.notifier).state = null;
+    } catch (_) {}
     _textController.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -397,13 +402,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           activeMembers.where((m) => m.userId == _directMemberId).firstOrNull;
       final isOnline =
           _directMemberId != null && onlineUserIds.contains(_directMemberId);
+      final lastSeenMap = ref.watch(lastSeenByUserProvider);
+      final memberLastSeen = (_directMemberId != null
+              ? lastSeenMap[_directMemberId!]
+              : null) ??
+          targetMember?.createdAt;
+      final seenText = formatLastSeen(memberLastSeen, isOnline: isOnline);
       if (targetMember != null) {
         screenTitle = targetMember.displayName;
-        screenSubtitle = isOnline
-            ? '🟢 Online now • ${targetMember.formattedRelation}'
-            : '⚪ Offline • ${targetMember.formattedRelation}';
+        screenSubtitle = '$seenText • ${targetMember.formattedRelation}';
       } else {
-        screenSubtitle = isOnline ? '🟢 Online now' : '⚪ Offline';
+        screenSubtitle = seenText;
       }
     }
 

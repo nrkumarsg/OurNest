@@ -3,8 +3,7 @@
 <head>
   <script>
     (function() {
-      var p = window.location.pathname;
-      var base = p.indexOf('/OurNest/app') === 0 ? '/OurNest/app/' : '/app/';
+      var base = window.location.pathname.indexOf('/OurNest/app') === 0 ? '/OurNest/app/' : '/app/';
       document.write('<base href="' + base + '">');
     })();
   </script>

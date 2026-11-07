@@ -217,6 +217,24 @@ class FamilyRepository {
     );
   }
 
+  /// Admin: Grants or revokes Shared Admin (Co-Admin) rights for another member
+  /// while keeping the current Admin's own Admin role intact.
+  Future<void> setMemberAdminRole({
+    required String familyId,
+    required String targetUserId,
+    required bool makeAdmin,
+  }) async {
+    final rows = await _client
+        .from('family_members')
+        .update({'role': makeAdmin ? 'admin' : 'member'})
+        .match({
+          'family_id': familyId,
+          'user_id': targetUserId,
+        })
+        .select('user_id');
+    expectChanged(rows, 'Only an Admin can grant or remove Shared Admin rights.');
+  }
+
   // ---------------------------------------------------------------------------
   // FAMILY-TO-FAMILY TREE CHAIN ("Connected Nests")
   //

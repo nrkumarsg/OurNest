@@ -249,6 +249,27 @@ class FamilyController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<bool> setMemberAdminRole({
+    required String familyId,
+    required String targetUserId,
+    required bool makeAdmin,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repository.setMemberAdminRole(
+        familyId: familyId,
+        targetUserId: targetUserId,
+        makeAdmin: makeAdmin,
+      );
+      state = const AsyncValue.data(null);
+      _invalidateAll();
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
   Future<bool> linkWithFamily({
     required String myFamilyId,
     required String targetInviteCode,

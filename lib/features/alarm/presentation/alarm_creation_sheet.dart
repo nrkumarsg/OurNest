@@ -180,6 +180,8 @@ class _AlarmCreationSheetState extends ConsumerState<AlarmCreationSheet> {
               DropdownButton<int>(
                 value: _escalateMin,
                 items: const [
+                  DropdownMenuItem(
+                      value: 0, child: Text('0 min (Buzzer on Both Now)')),
                   DropdownMenuItem(value: 3, child: Text('3 minutes')),
                   DropdownMenuItem(value: 5, child: Text('5 minutes')),
                   DropdownMenuItem(value: 10, child: Text('10 minutes')),

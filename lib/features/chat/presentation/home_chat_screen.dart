@@ -22,6 +22,10 @@ class HomeChatScreen extends ConsumerWidget {
     final activeMembers = ref.watch(activeMembersProvider);
     final familyMessagesAsync = ref.watch(familyMessagesProvider);
     final onlineUserIds = ref.watch(onlineUserIdsProvider);
+    final lastSeenMap = ref.watch(lastSeenByUserProvider);
+    final unreadByThread = ref.watch(unreadCountByThreadProvider);
+    final totalUnread = ref.watch(totalUnreadCountProvider);
+    final familyUnread = unreadByThread['family'] ?? 0;
 
     final fam = familyAsync.value;
     final myUid = membershipAsync.value?.userId;
@@ -29,7 +33,31 @@ class HomeChatScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const NestWordmark(fontSize: 26),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const NestWordmark(fontSize: 26),
+            if (totalUnread > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE53935),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  '$totalUnread',
+                  style: GoogleFonts.nunito(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline_rounded),
@@ -91,21 +119,47 @@ class HomeChatScreen extends ConsumerWidget {
                                           fontWeight: FontWeight.w800,
                                         ),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryTeal,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      'Everyone',
-                                      style: GoogleFonts.nunito(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (familyUnread > 0) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 9, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFE53935),
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                          ),
+                                          child: Text(
+                                            '$familyUnread',
+                                            style: GoogleFonts.nunito(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                      ],
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryTeal,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          'Everyone',
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -197,12 +251,20 @@ class HomeChatScreen extends ConsumerWidget {
               else
                 ...otherMembers.map((member) {
                   final isMemberOnline = onlineUserIds.contains(member.userId);
+                  final memberLastSeen =
+                      lastSeenMap[member.userId] ?? member.createdAt;
+                  final statusLabel = formatLastSeen(
+                    memberLastSeen,
+                    isOnline: isMemberOnline,
+                  );
+                  final memberUnread = unreadByThread[member.userId] ?? 0;
                   return Card(
                     margin: const EdgeInsets.only(bottom: 10),
                     child: ListTile(
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       leading: Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           CircleAvatar(
                             radius: 26,
@@ -237,6 +299,29 @@ class HomeChatScreen extends ConsumerWidget {
                               ),
                             ),
                           ),
+                          if (memberUnread > 0)
+                            Positioned(
+                              right: -4,
+                              top: -4,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE53935),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: Colors.white, width: 1.5),
+                                ),
+                                child: Text(
+                                  '$memberUnread',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       title: Row(
@@ -258,13 +343,39 @@ class HomeChatScreen extends ConsumerWidget {
                         ],
                       ),
                       subtitle: Text(
-                        isMemberOnline
-                            ? '🟢 Online now • Tap to chat privately'
-                            : '⚪ Offline • Tap to chat privately',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        statusLabel,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: isMemberOnline
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
                       ),
-                      trailing: const Icon(Icons.chat_bubble_outline_rounded,
-                          color: AppColors.primaryTeal),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (memberUnread > 0) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE53935),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Text(
+                                '$memberUnread',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          const Icon(Icons.chat_bubble_outline_rounded,
+                              color: AppColors.primaryTeal),
+                        ],
+                      ),
                       onTap: () => context.push('/chat/${member.userId}'),
                     ),
                   );

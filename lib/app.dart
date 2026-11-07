@@ -42,6 +42,9 @@ class _OurNestAppState extends ConsumerState<OurNestApp> {
     _tapSub = LocalNotifications.taps.listen((payload) {
       NotificationRouting.open(ref.read(appRouterProvider), payload);
     });
+    ref.read(alarmSchedulerServiceProvider).onForegroundAlarmRing = (tap) {
+      ref.read(appRouterProvider).push('/alarm', extra: tap);
+    };
     // Text, links or photos shared from other apps open the family chat
     // (F44). The sign-in guard sends signed-out users to login first; the
     // share waits in pendingShareProvider until they reach home.

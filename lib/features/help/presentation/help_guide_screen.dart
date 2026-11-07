@@ -248,20 +248,36 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tabLabelColor = isDark ? Colors.white : AppColors.primaryTeal;
+    final tabUnselectedColor =
+        isDark ? const Color(0xFFB0BEC5) : AppColors.textSecondaryLight;
+    final tabIndicatorColor =
+        isDark ? AppColors.accentCoral : AppColors.primaryTeal;
+
     return Scaffold(
+      backgroundColor:
+          isDark ? const Color(0xFF0F1716) : AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Help & Instructions'),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppColors.primaryTeal,
-          unselectedLabelColor: AppColors.textSecondaryLight,
-          indicatorColor: AppColors.primaryTeal,
-          indicatorWeight: 3,
-          labelStyle: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 14),
+          labelColor: tabLabelColor,
+          unselectedLabelColor: tabUnselectedColor,
+          indicatorColor: tabIndicatorColor,
+          indicatorWeight: 3.5,
+          labelStyle:
+              GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 14),
           tabs: const [
-            Tab(icon: Icon(Icons.menu_book_rounded, size: 20), text: 'Features Guide'),
-            Tab(icon: Icon(Icons.account_tree_rounded, size: 20), text: 'Visual Flows'),
-            Tab(icon: Icon(Icons.question_answer_rounded, size: 20), text: 'FAQ & Tips'),
+            Tab(
+                icon: Icon(Icons.menu_book_rounded, size: 20),
+                text: 'Features Guide'),
+            Tab(
+                icon: Icon(Icons.account_tree_rounded, size: 20),
+                text: 'Visual Flows'),
+            Tab(
+                icon: Icon(Icons.question_answer_rounded, size: 20),
+                text: 'FAQ & Tips'),
           ],
         ),
       ),
@@ -282,6 +298,15 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
   // TAB 1: FEATURES GUIDE
   // ---------------------------------------------------------
   Widget _buildFeaturesTab() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1A2625) : AppColors.cardLight;
+    final textPrimary =
+        isDark ? const Color(0xFFF5F7F7) : AppColors.textPrimaryLight;
+    final textSecondary =
+        isDark ? const Color(0xFFCFD8DC) : AppColors.textSecondaryLight;
+    final borderColor =
+        isDark ? const Color(0xFF2E4340) : AppColors.dividerLight;
+
     final filteredTopics = _topics.where((t) {
       final matchesCategory =
           _selectedCategory == 'All' || t.category == _selectedCategory;
@@ -299,31 +324,46 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
         // Search Header
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          color: Theme.of(context).cardTheme.color,
+          color: cardBg,
           child: TextField(
             controller: _searchCtrl,
             style: GoogleFonts.nunito(
               fontSize: 16,
-              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+              color: textPrimary,
             ),
             decoration: InputDecoration(
-              hintText: 'Search features (e.g. alarm, QR, voice, calendar)...',
-              prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primaryTeal),
+              hintText: 'Search features (e.g. alarm, QR, tour, admin)...',
+              hintStyle: GoogleFonts.nunito(
+                fontSize: 15,
+                color: textSecondary.withOpacity(0.8),
+              ),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                color: isDark ? AppColors.accentCoral : AppColors.primaryTeal,
+              ),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 18),
+                      icon: Icon(Icons.close_rounded,
+                          size: 18, color: textPrimary),
                       onPressed: () {
                         _searchCtrl.clear();
                         setState(() => _searchQuery = '');
                       },
                     )
                   : null,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               filled: true,
-              fillColor: Theme.of(context).scaffoldBackgroundColor,
+              fillColor:
+                  isDark ? const Color(0xFF0F1716) : AppColors.backgroundLight,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: borderColor),
               ),
             ),
             onChanged: (val) {
@@ -334,7 +374,7 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
 
         // Category Filter Chips
         SizedBox(
-          height: 48,
+          height: 50,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -348,14 +388,18 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                   label: Text(
                     cat,
                     style: GoogleFonts.nunito(
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      color: isSelected ? Colors.white : AppColors.textPrimaryLight,
+                      fontSize: 13.5,
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w700,
+                      color: isSelected ? Colors.white : textPrimary,
                     ),
                   ),
                   selected: isSelected,
                   selectedColor: AppColors.primaryTeal,
-                  backgroundColor: AppColors.cardLight,
+                  backgroundColor: cardBg,
+                  side: BorderSide(
+                    color: isSelected ? AppColors.primaryTeal : borderColor,
+                  ),
                   onSelected: (val) {
                     setState(() => _selectedCategory = cat);
                   },
@@ -374,15 +418,15 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.search_off_rounded,
-                            size: 48, color: AppColors.textSecondaryLight),
+                        Icon(Icons.search_off_rounded,
+                            size: 48, color: textSecondary),
                         const SizedBox(height: 12),
                         Text(
                           'No topics found for "$_searchQuery"',
                           style: GoogleFonts.nunito(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondaryLight,
+                            color: textPrimary,
                           ),
                         ),
                       ],
@@ -390,7 +434,8 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   itemCount: filteredTopics.length + 1,
                   itemBuilder: (ctx, i) {
                     if (i == filteredTopics.length) {
@@ -398,39 +443,53 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                     }
 
                     final topic = filteredTopics[i];
+                    final topicAccent = isDark &&
+                            topic.color == AppColors.primaryTeal
+                        ? const Color(0xFF4DB6AC)
+                        : (isDark && topic.color == AppColors.textSecondaryLight
+                            ? const Color(0xFF80CBC4)
+                            : topic.color);
+
                     return Card(
+                      color: cardBg,
                       margin: const EdgeInsets.only(bottom: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
-                        side: BorderSide(
-                          color: AppColors.dividerLight.withOpacity(0.8),
-                        ),
+                        side: BorderSide(color: borderColor, width: 1.2),
                       ),
                       child: Theme(
-                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        data: Theme.of(context)
+                            .copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
+                          iconColor: textPrimary,
+                          collapsedIconColor: textSecondary,
                           leading: Container(
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: topic.color.withOpacity(0.12),
+                              color: topicAccent.withOpacity(isDark ? 0.22 : 0.12),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Icon(topic.icon, color: topic.color, size: 24),
+                            child:
+                                Icon(topic.icon, color: topicAccent, size: 24),
                           ),
                           title: Text(
                             topic.title,
                             style: GoogleFonts.nunito(
-                              fontSize: 16,
+                              fontSize: 16.5,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimaryLight,
+                              color: textPrimary,
                             ),
                           ),
-                          subtitle: Text(
-                            topic.summary,
-                            style: GoogleFonts.nunito(
-                              fontSize: 13,
-                              color: AppColors.textSecondaryLight,
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              topic.summary,
+                              style: GoogleFonts.nunito(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: textSecondary,
+                              ),
                             ),
                           ),
                           children: [
@@ -448,25 +507,31 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                                     final stepIdx = entry.key + 1;
                                     final step = entry.value;
                                     return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 5.0),
                                       child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Container(
-                                            width: 22,
-                                            height: 22,
-                                            margin: const EdgeInsets.only(right: 8, top: 2),
+                                            width: 24,
+                                            height: 24,
+                                            margin: const EdgeInsets.only(
+                                                right: 10, top: 2),
                                             alignment: Alignment.center,
                                             decoration: BoxDecoration(
-                                              color: topic.color.withOpacity(0.15),
+                                              color: topicAccent.withOpacity(
+                                                  isDark ? 0.28 : 0.15),
                                               shape: BoxShape.circle,
                                             ),
                                             child: Text(
                                               '$stepIdx',
                                               style: GoogleFonts.nunito(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w800,
-                                                color: topic.color,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w900,
+                                                color: isDark
+                                                    ? Colors.white
+                                                    : topicAccent,
                                               ),
                                             ),
                                           ),
@@ -474,9 +539,10 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                                             child: Text(
                                               step,
                                               style: GoogleFonts.nunito(
-                                                fontSize: 15,
+                                                fontSize: 15.5,
+                                                fontWeight: FontWeight.w600,
                                                 height: 1.45,
-                                                color: AppColors.textPrimaryLight,
+                                                color: textPrimary,
                                               ),
                                             ),
                                           ),
@@ -490,10 +556,12 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                                     Align(
                                       alignment: Alignment.centerRight,
                                       child: TextButton.icon(
-                                        icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                        icon: const Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 16),
                                         label: Text(topic.quickActionLabel!),
                                         style: TextButton.styleFrom(
-                                          foregroundColor: topic.color,
+                                          foregroundColor: topicAccent,
                                           textStyle: GoogleFonts.nunito(
                                             fontWeight: FontWeight.w800,
                                             fontSize: 14,
@@ -753,21 +821,34 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
       ),
     ];
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1A2625) : AppColors.cardLight;
+    final textPrimary =
+        isDark ? const Color(0xFFF5F7F7) : AppColors.textPrimaryLight;
+    final textSecondary =
+        isDark ? const Color(0xFFCFD8DC) : AppColors.textSecondaryLight;
+    final borderColor =
+        isDark ? const Color(0xFF2E4340) : AppColors.dividerLight;
+    final tealAccent =
+        isDark ? const Color(0xFF4DB6AC) : AppColors.primaryTeal;
+
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       children: [
         // Quick help banner
         Card(
-          color: AppColors.primaryTeal.withOpacity(0.08),
+          color: isDark
+              ? const Color(0xFF16322F)
+              : AppColors.primaryTeal.withOpacity(0.08),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: AppColors.primaryTeal.withOpacity(0.3)),
+            side: BorderSide(color: tealAccent.withOpacity(0.5), width: 1.2),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
-                const Icon(Icons.support_agent_rounded, color: AppColors.primaryTeal, size: 36),
+                Icon(Icons.support_agent_rounded, color: tealAccent, size: 36),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -776,17 +857,18 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                       Text(
                         'Family Support & Assistance',
                         style: GoogleFonts.nunito(
-                          fontSize: 16,
+                          fontSize: 16.5,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.primaryTeal,
+                          color: isDark ? Colors.white : AppColors.primaryTeal,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
                         'Have a question or need help setting up an elderly parent\'s device? We are here to help.',
                         style: GoogleFonts.nunito(
-                          fontSize: 13,
-                          color: AppColors.textSecondaryLight,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textSecondary,
                         ),
                       ),
                     ],
@@ -801,33 +883,42 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
         // FAQs
         ...faqs.map((faq) {
           return Card(
+            color: cardBg,
             margin: const EdgeInsets.only(bottom: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: AppColors.dividerLight.withOpacity(0.8)),
+              side: BorderSide(color: borderColor, width: 1.2),
             ),
-            child: ExpansionTile(
-              title: Text(
-                faq.q,
-                style: GoogleFonts.nunito(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimaryLight,
-                ),
-              ),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 18, right: 18, bottom: 16, top: 4),
-                  child: Text(
-                    faq.a,
-                    style: GoogleFonts.nunito(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: AppColors.textSecondaryLight,
-                    ),
+            child: Theme(
+              data: Theme.of(context)
+                  .copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                iconColor: textPrimary,
+                collapsedIconColor: textSecondary,
+                title: Text(
+                  faq.q,
+                  style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: textPrimary,
                   ),
                 ),
-              ],
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(
+                        left: 18, right: 18, bottom: 16, top: 4),
+                    child: Text(
+                      faq.a,
+                      style: GoogleFonts.nunito(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        height: 1.5,
+                        color: textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }),
@@ -848,10 +939,21 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
     required String description,
     required List<_FlowStep> steps,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1A2625) : AppColors.cardLight;
+    final textPrimary =
+        isDark ? const Color(0xFFF5F7F7) : AppColors.textPrimaryLight;
+    final textSecondary =
+        isDark ? const Color(0xFFCFD8DC) : AppColors.textSecondaryLight;
+    final accent = isDark && color == AppColors.primaryTeal
+        ? const Color(0xFF4DB6AC)
+        : color;
+
     return Card(
+      color: cardBg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: color.withOpacity(0.4), width: 1.2),
+        side: BorderSide(color: accent.withOpacity(0.55), width: 1.4),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18.0),
@@ -864,10 +966,10 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
+                    color: accent.withOpacity(isDark ? 0.22 : 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: color, size: 24),
+                  child: Icon(icon, color: accent, size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -876,7 +978,7 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                     style: GoogleFonts.nunito(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimaryLight,
+                      color: textPrimary,
                     ),
                   ),
                 ),
@@ -886,11 +988,15 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
             Text(
               description,
               style: GoogleFonts.nunito(
-                fontSize: 13,
-                color: AppColors.textSecondaryLight,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: textSecondary,
               ),
             ),
-            const Divider(height: 24),
+            Divider(
+              height: 24,
+              color: isDark ? const Color(0xFF2E4340) : AppColors.dividerLight,
+            ),
             ...steps.map((st) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
@@ -902,7 +1008,7 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                       height: 26,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: color,
+                        color: accent,
                         shape: BoxShape.circle,
                       ),
                       child: Text(
@@ -922,18 +1028,19 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
                           Text(
                             st.title,
                             style: GoogleFonts.nunito(
-                              fontSize: 15,
+                              fontSize: 15.5,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimaryLight,
+                              color: textPrimary,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             st.detail,
                             style: GoogleFonts.nunito(
-                              fontSize: 13.5,
-                              height: 1.4,
-                              color: AppColors.textSecondaryLight,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              height: 1.45,
+                              color: textSecondary,
                             ),
                           ),
                         ],
@@ -950,6 +1057,12 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
   }
 
   Widget _buildAttributionFooter() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textSecondary =
+        isDark ? const Color(0xFFCFD8DC) : AppColors.textSecondaryLight;
+    final tealAccent =
+        isDark ? const Color(0xFF4DB6AC) : AppColors.primaryTeal;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),
       alignment: Alignment.center,
@@ -961,11 +1074,11 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
               const NestLogoMark(size: 20),
               const SizedBox(width: 8),
               Text(
-                'OurNest v1.0.0',
+                'OurNest v1.2.4',
                 style: GoogleFonts.nunito(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.primaryTeal,
+                  color: tealAccent,
                 ),
               ),
             ],
@@ -976,7 +1089,7 @@ class _HelpGuideScreenState extends State<HelpGuideScreen>
             style: GoogleFonts.nunito(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.textSecondaryLight,
+              color: textSecondary,
             ),
           ),
         ],

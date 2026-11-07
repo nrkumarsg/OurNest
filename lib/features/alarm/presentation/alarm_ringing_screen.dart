@@ -9,7 +9,7 @@ import '../../family/presentation/family_controller.dart';
 import '../domain/shared_alarm_model.dart';
 import 'alarm_controller.dart';
 
-class AlarmRingingScreen extends ConsumerWidget {
+class AlarmRingingScreen extends ConsumerStatefulWidget {
   final SharedAlarm alarm;
   final bool isEscalation;
 
@@ -19,7 +19,29 @@ class AlarmRingingScreen extends ConsumerWidget {
     this.isEscalation = false,
   });
 
+  @override
+  ConsumerState<AlarmRingingScreen> createState() => _AlarmRingingScreenState();
+}
+
+class _AlarmRingingScreenState extends ConsumerState<AlarmRingingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(alarmSchedulerServiceProvider).startBuzzer();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    ref.read(alarmSchedulerServiceProvider).stopBuzzer();
+    super.dispose();
+  }
+
   Future<void> _callMember(String? phone) async {
+    await ref.read(alarmSchedulerServiceProvider).stopBuzzer();
     if (phone != null && phone.isNotEmpty) {
       final uri = Uri.parse('tel:$phone');
       if (await canLaunchUrl(uri)) {
@@ -30,7 +52,9 @@ class AlarmRingingScreen extends ConsumerWidget {
 
   /// Works whether the screen was pushed from chat or opened by tapping the
   /// alarm notification on a cold start (no screen to go back to).
-  void _close(BuildContext context) {
+  Future<void> _close(BuildContext context) async {
+    await ref.read(alarmSchedulerServiceProvider).stopBuzzer();
+    if (!context.mounted) return;
     if (context.canPop()) {
       context.pop();
     } else {
@@ -39,7 +63,9 @@ class AlarmRingingScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final alarm = widget.alarm;
+    final isEscalation = widget.isEscalation;
     final membership = ref.watch(currentMembershipProvider).value;
     final isOwner = alarm.isOwner(membership?.userId ?? '');
 
@@ -64,7 +90,7 @@ class AlarmRingingScreen extends ConsumerWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isEscalation ? Icons.warning_rounded : Icons.alarm_rounded,
+                    isEscalation ? Icons.warning_rounded : Icons.notifications_active_rounded,
                     size: 60,
                     color: isEscalation ? AppColors.error : AppColors.accentCoral,
                   ),
@@ -86,7 +112,7 @@ class AlarmRingingScreen extends ConsumerWidget {
               // Title / Warning
               Text(
                 isEscalation
-                    ? '🚨 ${alarm.ownerName ?? "Family Member"} hasn\'t woken up yet!'
+                    ? '🚨 ${alarm.ownerName ?? "Family Member"} Wake-Up Alert!'
                     : alarm.label,
                 style: GoogleFonts.nunito(
                   fontSize: 22,
@@ -98,18 +124,18 @@ class AlarmRingingScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               Text(
                 isEscalation
-                    ? 'This alarm has escalated to you because they did not confirm waking up.'
+                    ? 'Shared family wake-up buzzer is ringing on both phones!'
                     : 'Your family is counting on you to wake up!',
                 style: GoogleFonts.nunito(
                   fontSize: 16,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withOpacity(0.85),
                 ),
                 textAlign: TextAlign.center,
               ),
               const Spacer(flex: 2),
 
               // OWNER CONTROLS: "I'M AWAKE" & "Snooze"
-              if (!isEscalation && isOwner) ...[
+              if (isOwner) ...[
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.success,
@@ -120,20 +146,21 @@ class AlarmRingingScreen extends ConsumerWidget {
                     ),
                   ),
                   onPressed: () async {
+                    await ref.read(alarmSchedulerServiceProvider).stopBuzzer();
                     if (membership != null) {
                       await ref.read(alarmControllerProvider.notifier).acknowledgeAlarm(
                             familyId: membership.familyId,
                             alarmId: alarm.alarmId,
                           );
                     }
-                    if (context.mounted) _close(context);
+                    if (context.mounted) await _close(context);
                   },
                   child: Text(
-                    'I\'M AWAKE ✓',
+                    'I\'M AWAKE ✓ (Stop Buzzer)',
                     style: GoogleFonts.nunito(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 1.0,
+                      letterSpacing: 0.8,
                     ),
                   ),
                 ),
@@ -145,21 +172,21 @@ class AlarmRingingScreen extends ConsumerWidget {
                     minimumSize: const Size(double.infinity, 54),
                   ),
                   onPressed: () async {
-                    // Re-ring on this phone in 5 minutes (was a no-op before).
                     final scheduler = ref.read(alarmSchedulerServiceProvider);
+                    await scheduler.stopBuzzer();
                     await scheduler.cancelAlarm(alarm.alarmId);
                     await scheduler.scheduleAlarm(
                       alarm: alarm.copyWith(
                           time: DateTime.now().add(const Duration(minutes: 5))),
                       currentUserId: membership?.userId ?? '',
                     );
-                    if (context.mounted) _close(context);
+                    if (context.mounted) await _close(context);
                   },
                   child: const Text('Snooze (5 mins)'),
                 ),
               ],
 
-              // ESCALATION CONTROLS: [📞 Call him]
+              // PARTICIPANT / ESCALATION CONTROLS: [📞 Call] & [Stop Buzzer]
               if (isEscalation || !isOwner) ...[
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
@@ -179,7 +206,6 @@ class AlarmRingingScreen extends ConsumerWidget {
                     ),
                   ),
                   onPressed: () {
-                    // Look up the alarm owner's phone (was always null before).
                     final owner = ref
                         .read(activeMembersProvider)
                         .where((m) => m.userId == alarm.ownerId)
@@ -195,17 +221,27 @@ class AlarmRingingScreen extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: 16),
-                TextButton(
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white70, width: 2),
+                    minimumSize: const Size(double.infinity, 54),
+                  ),
+                  icon: const Icon(Icons.volume_off_rounded),
+                  label: Text(
+                    'Stop Buzzer / Dismiss Alert',
+                    style: GoogleFonts.nunito(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                   onPressed: () async {
                     await ref
                         .read(alarmSchedulerServiceProvider)
                         .cancelAlarm(alarm.alarmId);
-                    if (context.mounted) _close(context);
+                    if (context.mounted) await _close(context);
                   },
-                  child: Text(
-                    'Dismiss Alert',
-                    style: GoogleFonts.nunito(color: Colors.white70, fontSize: 16),
-                  ),
                 ),
               ],
               const Spacer(flex: 1),

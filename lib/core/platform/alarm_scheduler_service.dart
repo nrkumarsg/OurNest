@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -21,8 +23,10 @@ class AlarmNotificationTap {
 enum ReminderScheduleResult { scheduled, inPast, unsupported }
 
 class AlarmSchedulerService {
-  static const String _alarmChannelId = 'ournest_exact_alarms_v1';
-  static const String _alarmChannelName = 'OurNest Exact Alarms';
+  static const String _alarmChannelId = 'ournest_exact_alarms_v2';
+  static const String _alarmChannelName = 'OurNest Loud Wake-Up Alarms';
+  static const MethodChannel _buzzerChannel =
+      MethodChannel('com.ournest.app/alarm_buzzer');
 
   /// Payload prefixes. MainActivity.kt only allows lock-screen display for
   /// notifications whose payload starts with one of these.
@@ -30,8 +34,44 @@ class AlarmSchedulerService {
   static const escalatePrefix = 'alarm_escalate:';
 
   bool _initialized = false;
+  Timer? _fallbackBuzzerTimer;
+  final Map<String, Timer> _foregroundTimers = {};
+  void Function(AlarmNotificationTap tap)? onForegroundAlarmRing;
 
   FlutterLocalNotificationsPlugin get _notifications => LocalNotifications.plugin;
+
+  /// Starts the continuous hardware alarm ringtone + vibration on Android
+  /// (plus system alert sound + haptics fallback on all platforms).
+  Future<void> startBuzzer() async {
+    stopBuzzer();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _buzzerChannel.invokeMethod('startBuzzer');
+      } catch (_) {}
+    }
+    try {
+      await SystemSound.play(SystemSoundType.alert);
+      await HapticFeedback.vibrate();
+    } catch (_) {}
+    _fallbackBuzzerTimer =
+        Timer.periodic(const Duration(seconds: 2), (_) async {
+      try {
+        await HapticFeedback.vibrate();
+        await SystemSound.play(SystemSoundType.alert);
+      } catch (_) {}
+    });
+  }
+
+  /// Stops the continuous hardware alarm ringtone + vibration.
+  Future<void> stopBuzzer() async {
+    _fallbackBuzzerTimer?.cancel();
+    _fallbackBuzzerTimer = null;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _buzzerChannel.invokeMethod('stopBuzzer');
+      } catch (_) {}
+    }
+  }
 
   /// Stable 31-bit notification id (FNV-1a). Dart's String.hashCode is not
   /// guaranteed to be the same across isolates/app runs, and the background
@@ -96,6 +136,7 @@ class AlarmSchedulerService {
           importance: Importance.max,
           enableVibration: true,
           playSound: true,
+          audioAttributesUsage: AudioAttributesUsage.alarm,
         ),
       );
 
@@ -110,24 +151,47 @@ class AlarmSchedulerService {
     _initialized = true;
   }
 
-  /// Schedules the primary alarm on the owner's devices and the escalation
-  /// alarm on every other participant's device.
+  void _scheduleForegroundBuzzerTimer({
+    required SharedAlarm alarm,
+    required bool isOwner,
+  }) {
+    _foregroundTimers[alarm.alarmId]?.cancel();
+    final delay = alarm.time.difference(DateTime.now());
+    if (delay.isNegative) return;
+    _foregroundTimers[alarm.alarmId] = Timer(delay, () {
+      startBuzzer();
+      onForegroundAlarmRing?.call(
+        AlarmNotificationTap(alarm, isEscalation: !isOwner),
+      );
+    });
+  }
+
+  /// Schedules the primary alarm on BOTH the owner's and participants' devices
+  /// at `alarm.time`, plus the escalation follow-up on participants' devices.
   Future<void> scheduleAlarm({
     required SharedAlarm alarm,
     required String currentUserId,
   }) async {
-    if (!LocalNotifications.isSupported) return;
-    await init();
-
     final isOwner = alarm.isOwner(currentUserId);
     final isParticipant = alarm.isParticipant(currentUserId);
 
-    // 1. Owner: primary alarm at the exact time
-    if (isOwner && alarm.time.isAfter(DateTime.now())) {
+    if ((isOwner || isParticipant) && alarm.time.isAfter(DateTime.now())) {
+      _scheduleForegroundBuzzerTimer(alarm: alarm, isOwner: isOwner);
+    }
+
+    if (!LocalNotifications.isSupported) return;
+    await init();
+
+    // 1. Primary alarm at the exact time on BOTH phones (owner + all participants)
+    if ((isOwner || isParticipant) && alarm.time.isAfter(DateTime.now())) {
       await _notifications.zonedSchedule(
         ringId(alarm.alarmId),
-        '⏰ Wake-up Alarm: ${alarm.label}',
-        'Time to wake up! Tap "I\'m awake" to confirm.',
+        isOwner
+            ? '⏰ Wake-up Alarm: ${alarm.label}'
+            : '⏰ Shared Family Alarm (${alarm.ownerName ?? "Family"}): ${alarm.label}',
+        isOwner
+            ? 'Time to wake up! Tap "I\'m awake" to confirm.'
+            : 'Shared wake-up alarm is ringing! Tap to open or call.',
         tz.TZDateTime.from(alarm.time, tz.local),
         const NotificationDetails(
           android: AndroidNotificationDetails(
@@ -138,6 +202,8 @@ class AlarmSchedulerService {
             fullScreenIntent: true,
             ongoing: true,
             autoCancel: false,
+            playSound: true,
+            enableVibration: true,
             category: AndroidNotificationCategory.alarm,
             audioAttributesUsage: AudioAttributesUsage.alarm,
           ),
@@ -150,13 +216,16 @@ class AlarmSchedulerService {
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
-        payload: buildPayload(alarm: alarm, escalation: false),
+        payload: buildPayload(alarm: alarm, escalation: !isOwner),
       );
     }
 
-    // 2. Other participants: escalation at time + escalateAfterMin, cancelled
-    //    when the owner's "I'm awake" (ack) event arrives.
-    if (!isOwner && isParticipant && alarm.escalationTime.isAfter(DateTime.now())) {
+    // 2. Other participants: escalation follow-up at time + escalateAfterMin,
+    //    cancelled when the owner's "I'm awake" (ack) event arrives.
+    if (!isOwner &&
+        isParticipant &&
+        alarm.escalateAfterMin > 0 &&
+        alarm.escalationTime.isAfter(DateTime.now())) {
       await _notifications.zonedSchedule(
         escalationId(alarm.alarmId),
         '🚨 Escalation: ${alarm.ownerName ?? "Family Member"} hasn\'t woken up!',
@@ -169,6 +238,8 @@ class AlarmSchedulerService {
             importance: Importance.max,
             priority: Priority.max,
             fullScreenIntent: true,
+            playSound: true,
+            enableVibration: true,
             category: AndroidNotificationCategory.alarm,
             audioAttributesUsage: AudioAttributesUsage.alarm,
           ),
@@ -247,8 +318,10 @@ class AlarmSchedulerService {
     return ReminderScheduleResult.scheduled;
   }
 
-  /// Cancels both primary and escalation alarms on this device.
+  /// Cancels both primary and escalation alarms on this device and stops buzzer.
   Future<void> cancelAlarm(String alarmId) async {
+    _foregroundTimers.remove(alarmId)?.cancel();
+    await stopBuzzer();
     if (!LocalNotifications.isSupported) return;
     await init();
     await _notifications.cancel(ringId(alarmId));

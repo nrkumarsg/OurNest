@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/platform/alarm_scheduler_service.dart';
 import '../../../family/presentation/family_controller.dart';
 import '../../domain/shared_alarm_model.dart';
 import '../alarm_controller.dart';
@@ -84,8 +86,14 @@ class AlarmCard extends ConsumerWidget {
       statusText = 'Cancelled';
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary =
+        isDark ? const Color(0xFFF5F7F7) : AppColors.textPrimaryLight;
+    final textSecondary =
+        isDark ? const Color(0xFFCFD8DC) : AppColors.textSecondaryLight;
+
     return Container(
-      width: 270,
+      width: 280,
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -129,10 +137,24 @@ class AlarmCard extends ConsumerWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimaryLight,
+                      color: textPrimary,
                     ),
                   ),
                 ],
+              ),
+              IconButton(
+                tooltip: 'Ring / Test Buzzer Now',
+                icon: const Icon(Icons.notifications_active_rounded,
+                    color: AppColors.accentCoral, size: 22),
+                onPressed: () {
+                  context.push(
+                    '/alarm',
+                    extra: AlarmNotificationTap(
+                      alarm,
+                      isEscalation: !alarm.isOwner(myUserId),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -143,14 +165,14 @@ class AlarmCard extends ConsumerWidget {
             style: GoogleFonts.nunito(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimaryLight,
+              color: textPrimary,
             ),
           ),
           Text(
-            '${alarm.formattedDate} • Escalate after ${alarm.escalateAfterMin}m',
+            '${alarm.formattedDate} • Ring Both Phones (${alarm.escalateAfterMin}m follow-up)',
             style: GoogleFonts.nunito(
               fontSize: 12.5,
-              color: AppColors.textSecondaryLight,
+              color: textSecondary,
             ),
           ),
           const SizedBox(height: 12),

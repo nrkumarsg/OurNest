@@ -283,7 +283,7 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
                 ],
                 const SizedBox(height: 18),
                 Text(
-                  'Or 1-Tap Community / Church / Temple / Single Role:',
+                  'Or 1-Tap Tour / Custom / Community / Volunteer Role:',
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
@@ -295,6 +295,9 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    '🧳 Tour Group Member',
+                    '✈️ Tour Co-Leader',
+                    '✨ Custom Group Member',
                     '🛕 Temple Volunteer',
                     '⛪ Church Member',
                     '👑 Group Coordinator',

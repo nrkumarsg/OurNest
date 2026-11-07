@@ -2,17 +2,60 @@ import 'dart:async';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/crypto/crypto_service.dart';
 import '../../../core/crypto/device_key_manager.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/network/supabase_client.dart';
+import '../../../core/notifications/notification_service.dart';
 import '../../alarm/data/alarm_coordinator.dart';
 import '../domain/chat_message_model.dart';
 import '../domain/message_payload.dart';
 
 /// Live set of user IDs currently online in the family Realtime channel
 final onlineUserIdsProvider = StateProvider<Set<String>>((ref) => <String>{});
+
+/// Last seen timestamps by user ID (updated from Realtime Presence & message activity)
+final lastSeenByUserProvider =
+    StateProvider<Map<String, DateTime>>((ref) => <String, DateTime>{});
+
+/// Unread message counts keyed by threadId ('family' or direct userId)
+final unreadCountByThreadProvider =
+    StateProvider<Map<String, int>>((ref) => <String, int>{});
+
+/// Total unread messages across all threads (used for Android launcher badge)
+final totalUnreadCountProvider = Provider<int>((ref) {
+  final map = ref.watch(unreadCountByThreadProvider);
+  return map.values.fold(0, (sum, v) => sum + v);
+});
+
+/// Currently open chat thread ('family', userId, or null when on Home/other screen)
+final activeOpenThreadProvider = StateProvider<String?>((ref) => null);
+
+/// Formats a friendly Last Seen string for Chat & Member screens
+String formatLastSeen(DateTime? lastSeen, {required bool isOnline}) {
+  if (isOnline) return '🟢 Online now';
+  if (lastSeen == null) return '⚪ Offline';
+  final local = lastSeen.toLocal();
+  final now = DateTime.now();
+  final diff = now.difference(local);
+  if (diff.inSeconds < 60) {
+    return '🕒 Last seen just now';
+  } else if (diff.inMinutes < 60) {
+    return '🕒 Last seen ${diff.inMinutes}m ago';
+  }
+  final today = DateTime(now.year, now.month, now.day);
+  final seenDay = DateTime(local.year, local.month, local.day);
+  final timeStr = DateFormat('h:mm a').format(local);
+  if (seenDay == today) {
+    return '🕒 Last seen today at $timeStr';
+  } else if (today.difference(seenDay).inDays == 1) {
+    return '🕒 Last seen yesterday at $timeStr';
+  } else {
+    return '🕒 Last seen ${DateFormat('d MMM, h:mm a').format(local)}';
+  }
+}
 
 /// Message IDs that have been delivered to at least one recipient device (Double Tick ✓✓)
 final deliveredMessageIdsProvider =
@@ -267,19 +310,38 @@ class ChatRepository {
         .onPresenceSync((_) {
           try {
             final state = channel.presenceState();
+            final prevOnline = _ref.read(onlineUserIdsProvider);
             final onlineIds = <String>{};
+            final nextLastSeen = Map<String, DateTime>.from(
+              _ref.read(lastSeenByUserProvider),
+            );
+            final now = DateTime.now();
+
             for (final singleState in state) {
               for (final presence in singleState.presences) {
                 final uid = presence.payload['user_id']?.toString();
                 if (uid != null && uid.isNotEmpty) {
                   onlineIds.add(uid);
+                  final onlineAtStr = presence.payload['online_at']?.toString();
+                  final parsed = onlineAtStr != null
+                      ? DateTime.tryParse(onlineAtStr)
+                      : null;
+                  nextLastSeen[uid] = parsed ?? now;
                 }
+              }
+            }
+            // Anyone who was online and just disconnected gets their lastSeen stamped to now
+            for (final prevUid in prevOnline) {
+              if (!onlineIds.contains(prevUid)) {
+                nextLastSeen[prevUid] = now;
               }
             }
             if (currentUserId != null) {
               onlineIds.add(currentUserId!);
+              nextLastSeen[currentUserId!] = now;
             }
             _ref.read(onlineUserIdsProvider.notifier).state = onlineIds;
+            _ref.read(lastSeenByUserProvider.notifier).state = nextLastSeen;
           } catch (_) {}
         })
         .onBroadcast(
@@ -404,7 +466,7 @@ class ChatRepository {
         await _decryptAndStore(msgRecord, keyRow['locked_key'] as String);
 
     // Broadcast immediate Delivery ACK (Double Tick ✓✓) to sender
-    if (stored && senderId != currentUserId) {
+    if (stored && senderId != null && senderId != currentUserId) {
       try {
         await _subscription?.sendBroadcastMessage(
           event: 'delivery_ack',
@@ -414,6 +476,45 @@ class ChatRepository {
           },
         );
       } catch (_) {}
+
+      // Update unread badge count & trigger phone notification if thread is not open
+      final audience = msgRecord['audience'] as String? ?? 'all';
+      final threadKey = audience == 'selected' ? senderId : 'family';
+      final openThread = _ref.read(activeOpenThreadProvider);
+      if (openThread != threadKey) {
+        final currentMap =
+            Map<String, int>.from(_ref.read(unreadCountByThreadProvider));
+        currentMap[threadKey] = (currentMap[threadKey] ?? 0) + 1;
+        _ref.read(unreadCountByThreadProvider.notifier).state = currentMap;
+
+        final totalUnread =
+            currentMap.values.fold<int>(0, (sum, count) => sum + count);
+        final familyId = msgRecord['family_id'] as String? ?? 'family';
+        unawaited(
+          NotificationService.showMessageNotification(
+            id: messageId.hashCode & 0x7FFFFFFF,
+            title: totalUnread > 1
+                ? 'OurNest ($totalUnread new messages)'
+                : 'OurNest — New Family Message',
+            body: 'Tap to read your encrypted family message',
+            payload: NotificationService.chatPayload(familyId),
+            badgeCount: totalUnread,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Clears unread count for [threadKey] ('family' or direct userId) and updates Android launcher badge
+  Future<void> markThreadRead(String threadKey) async {
+    final currentMap =
+        Map<String, int>.from(_ref.read(unreadCountByThreadProvider));
+    if ((currentMap[threadKey] ?? 0) > 0) {
+      currentMap.remove(threadKey);
+      _ref.read(unreadCountByThreadProvider.notifier).state = currentMap;
+      final remaining =
+          currentMap.values.fold<int>(0, (sum, count) => sum + count);
+      await NotificationService.updateLauncherBadge(remaining);
     }
   }
 
@@ -440,6 +541,17 @@ class ChatRepository {
 
       final payload = MessagePayload.fromDecryptedJson(decryptedJson);
       final senderId = msgRecord['sender_id'] as String;
+      final msgCreatedAt =
+          DateTime.parse(msgRecord['created_at'] as String);
+
+      // Update sender's lastSeen timestamp from message activity
+      final seenMap =
+          Map<String, DateTime>.from(_ref.read(lastSeenByUserProvider));
+      final existingSeen = seenMap[senderId];
+      if (existingSeen == null || msgCreatedAt.isAfter(existingSeen)) {
+        seenMap[senderId] = msgCreatedAt;
+        _ref.read(lastSeenByUserProvider.notifier).state = seenMap;
+      }
 
       await _db.insertOrUpdateMessage(
         LocalMessagesCompanion(
@@ -613,7 +725,11 @@ class ChatRepository {
     dispose();
     _readAckSent.clear();
     _ref.read(onlineUserIdsProvider.notifier).state = <String>{};
+    _ref.read(lastSeenByUserProvider.notifier).state = <String, DateTime>{};
+    _ref.read(unreadCountByThreadProvider.notifier).state = <String, int>{};
+    _ref.read(activeOpenThreadProvider.notifier).state = null;
     _ref.read(deliveredMessageIdsProvider.notifier).state = <String>{};
     _ref.read(readMessageIdsProvider.notifier).state = <String>{};
+    unawaited(NotificationService.updateLauncherBadge(0));
   }
 }
