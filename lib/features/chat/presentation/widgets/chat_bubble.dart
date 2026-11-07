@@ -19,12 +19,14 @@ class ChatBubble extends ConsumerWidget {
   final ChatMessage message;
   final VoidCallback? onDelete;
   final VoidCallback? onReply;
+  final void Function(String updatedChecklistText)? onUpdateChecklist;
 
   const ChatBubble({
     super.key,
     required this.message,
     this.onDelete,
     this.onReply,
+    this.onUpdateChecklist,
   });
 
   void _showContextMenu(BuildContext context) {
@@ -232,6 +234,7 @@ class ChatBubble extends ConsumerWidget {
                 InteractiveChecklistCard(
                   rawText: message.displayText,
                   isMine: isMine,
+                  onUpdateChecklist: onUpdateChecklist,
                 ),
               ] else ...[
                 Text(

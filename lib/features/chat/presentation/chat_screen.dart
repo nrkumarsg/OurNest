@@ -539,6 +539,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         onDelete: () => ref
                             .read(chatControllerProvider.notifier)
                             .deleteMessage(msg.id),
+                        onUpdateChecklist: (updatedText) async {
+                          final membership =
+                              ref.read(currentMembershipProvider).value;
+                          if (membership == null) return;
+                          final audienceState = ref.read(audienceStateProvider);
+                          final ok = await ref
+                              .read(chatControllerProvider.notifier)
+                              .sendMessage(
+                                familyId: membership.familyId,
+                                text: updatedText,
+                                audience: _isDirect
+                                    ? MessageAudience.selected
+                                    : audienceState.audience,
+                                selectedRecipientIds: _isDirect
+                                    ? [_directMemberId!]
+                                    : audienceState.selectedRecipientIds,
+                              );
+                          if (!ok) {
+                            _showSendError();
+                            return;
+                          }
+                          _scrollToBottom();
+                        },
                       );
                     },
                   );
