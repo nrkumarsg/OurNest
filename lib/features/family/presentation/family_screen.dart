@@ -75,12 +75,28 @@ class _FamilyScreenState extends ConsumerState<FamilyScreen>
 
   void _showInviteModal(BuildContext context, Family family,
       {int initialTab = 0}) {
-    Navigator.of(context).push(
+    final adminMember = ref
+        .read(activeMembersProvider)
+        .where((m) => m.isAdmin && m.profile != null)
+        .firstOrNull;
+    final adminProfile = adminMember?.profile;
+    Navigator.of(context).push<ParsedFamilyInvite>(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => FamilyQrScannerModal(
           family: family,
+          adminCity: adminProfile?.livingPlace ?? adminProfile?.city,
+          adminAddress: adminProfile?.homeAddress,
           initialTabIndex: initialTab,
+          onInviteScanned: (parsed) {
+            if (!context.mounted) return;
+            _showLinkFamilySheet(
+              context,
+              family,
+              initialCode: parsed.code,
+              initialNameHint: parsed.familyName,
+            );
+          },
           onResetInviteCode: (ref.read(currentMembershipProvider).value?.isAdmin ?? false)
               ? () async {
                   final code = await ref

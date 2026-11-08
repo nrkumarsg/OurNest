@@ -10,16 +10,20 @@ import '../../domain/family_model.dart';
 class ParsedFamilyInvite {
   final String code;
   final String? familyName;
+  final String? adminCity;
+  final String? adminAddress;
 
   const ParsedFamilyInvite({
     required this.code,
     this.familyName,
+    this.adminCity,
+    this.adminAddress,
   });
 }
 
 /// Universal parser for OurNest QR codes and invite strings.
 /// Supports:
-/// - ournest://invite/FMS258?name=N.R.K%20Family
+/// - ournest://invite/FMS258?name=N.R.K%20Family&city=Singapore&addr=Blk%20123
 /// - https://ournest.app/join?code=FMS258&name=N.R.K+Family
 /// - OURNEST:FMS258:N.R.K Family
 /// - Plain 6-char code: FMS258
@@ -34,6 +38,8 @@ ParsedFamilyInvite? parseInviteQrPayload(String? rawValue) {
   if (uri != null && (uri.scheme == 'ournest' || uri.scheme == 'http' || uri.scheme == 'https')) {
     String? code = uri.queryParameters['code'];
     final String? name = uri.queryParameters['name'];
+    final String? city = uri.queryParameters['city'];
+    final String? addr = uri.queryParameters['addr'];
 
     if ((code == null || code.isEmpty) && uri.pathSegments.isNotEmpty) {
       code = uri.pathSegments.last;
@@ -42,6 +48,8 @@ ParsedFamilyInvite? parseInviteQrPayload(String? rawValue) {
       return ParsedFamilyInvite(
         code: code.trim().toUpperCase(),
         familyName: (name != null && name.trim().isNotEmpty) ? name.trim() : null,
+        adminCity: (city != null && city.trim().isNotEmpty) ? city.trim() : null,
+        adminAddress: (addr != null && addr.trim().isNotEmpty) ? addr.trim() : null,
       );
     }
   }
@@ -85,10 +93,22 @@ ParsedFamilyInvite? parseInviteQrPayload(String? rawValue) {
 }
 
 /// Builds the canonical QR payload for a Family so both OurNest's embedded scanner
-/// and external camera readers can parse the code and family name reliably.
-String buildFamilyQrData(Family family) {
-  final encodedName = Uri.encodeQueryComponent(family.name);
-  return 'ournest://invite/${family.inviteCode.toUpperCase()}?name=$encodedName';
+/// and external camera readers can parse the code, family name, and optional Admin
+/// household city/address reliably.
+String buildFamilyQrData(
+  Family family, {
+  String? adminCity,
+  String? adminAddress,
+}) {
+  final params = <String, String>{
+    'name': family.name,
+    if (adminCity != null && adminCity.trim().isNotEmpty)
+      'city': adminCity.trim(),
+    if (adminAddress != null && adminAddress.trim().isNotEmpty)
+      'addr': adminAddress.trim(),
+  };
+  final query = Uri(queryParameters: params).query;
+  return 'ournest://invite/${family.inviteCode.toUpperCase()}?$query';
 }
 
 /// WhatsApp-style 2-Tab Modal / Fullscreen Sheet:
@@ -96,6 +116,8 @@ String buildFamilyQrData(Family family) {
 /// - Tab 2: "Scan QR Code" (Live Camera + Torch + Flip Camera + Pick QR from Gallery)
 class FamilyQrScannerModal extends StatefulWidget {
   final Family? family;
+  final String? adminCity;
+  final String? adminAddress;
   final int initialTabIndex;
   final ValueChanged<ParsedFamilyInvite>? onInviteScanned;
 
@@ -106,6 +128,8 @@ class FamilyQrScannerModal extends StatefulWidget {
   const FamilyQrScannerModal({
     super.key,
     this.family,
+    this.adminCity,
+    this.adminAddress,
     this.initialTabIndex = 0,
     this.onInviteScanned,
     this.onResetInviteCode,
@@ -292,7 +316,11 @@ class _FamilyQrScannerModalState extends State<FamilyQrScannerModal>
   }
 
   Widget _buildMyFamilyQrTab(Family family) {
-    final qrPayload = buildFamilyQrData(family);
+    final qrPayload = buildFamilyQrData(
+      family,
+      adminCity: widget.adminCity,
+      adminAddress: widget.adminAddress,
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),

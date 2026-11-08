@@ -5,7 +5,10 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/nest_logo.dart';
 import 'widgets/family_qr_scanner_modal.dart';
 
-/// Screen presented to a user who has completed profile setup but is not in any family yet.
+/// Opening Entrance Screen presented to a user who is not in any family/group yet.
+/// Lets the user immediately pick:
+/// 1. "I Have a Family / Group" (Scan QR Code or Enter 6-Digit Invite Code)
+/// 2. "I Don't Have a Family / Group Yet" (Create a New Family / Group as Admin)
 class FamilyEntryScreen extends StatelessWidget {
   const FamilyEntryScreen({super.key});
 
@@ -22,6 +25,8 @@ class FamilyEntryScreen extends StatelessWidget {
         queryParameters: {
           'code': result.code,
           if (result.familyName != null) 'name': result.familyName!,
+          if (result.adminCity != null) 'city': result.adminCity!,
+          if (result.adminAddress != null) 'addr': result.adminAddress!,
         },
       ).query;
       context.push('/join-family?$query');
@@ -30,6 +35,12 @@ class FamilyEntryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final subColor = isDark
+        ? const Color(0xFFCFD8DC)
+        : AppColors.textSecondaryLight;
+
     return Scaffold(
       appBar: AppBar(
         title: const NestWordmark(fontSize: 28),
@@ -37,187 +48,253 @@ class FamilyEntryScreen extends StatelessWidget {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 18.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
-              const Center(child: NestLogoMark(size: 84)),
-              const SizedBox(height: 20),
+              const Center(child: NestLogoMark(size: 76)),
+              const SizedBox(height: 14),
               Text(
-                'Connect with Your Family',
+                'Welcome to OurNest',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                     ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
-                'OurNest is a closed family circle. Start a new family as Admin, or scan your family\'s QR code to link right away.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textSecondaryLight,
-                    ),
+                'Choose one option below to get started in seconds:',
+                style: GoogleFonts.nunito(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w700,
+                  color: subColor,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 22),
 
-              // Primary Quick Action: Scan QR Code (WhatsApp Linked Devices style)
-              Card(
-                color: AppColors.primaryTeal,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+              // ===============================================================
+              // CHOICE 1: I HAVE A FAMILY / GROUP (SCAN QR OR ENTER 6-DIGIT CODE)
+              // ===============================================================
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTeal.withOpacity(isDark ? 0.18 : 0.08),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: AppColors.primaryTeal,
+                    width: 2,
+                  ),
                 ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => _openDirectQrScanner(context),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
                         Container(
-                          width: 54,
-                          height: 54,
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(16),
+                            color: AppColors.primaryTeal,
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Icon(
                             Icons.qr_code_scanner_rounded,
                             color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Scan Family QR Code',
-                                style: GoogleFonts.nunito(
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Point camera at Admin\'s QR or pick screenshot from gallery',
-                                style: GoogleFonts.nunito(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white.withOpacity(0.9),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 18,
-                          color: Colors.white,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Option 2: Join with 6-character code
-              Card(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => context.push('/join-family'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: AppColors.accentCoral.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(
-                            Icons.vpn_key_rounded,
-                            color: AppColors.accentCoral,
                             size: 28,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Enter 6-Digit Invite Code',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryTeal,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'OPTION 1 • JOIN EXISTING',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Type the 6-character code shared by your family admin',
-                                style: Theme.of(context).textTheme.bodySmall,
+                                '📲 I Have a Family / Group',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: onSurface,
+                                ),
                               ),
                             ],
                           ),
                         ),
-                        const Icon(Icons.arrow_forward_ios_rounded, size: 18),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Your Admin already created the Family, Tour, or Community Group. Scan their QR code or enter the 6-digit invite code — Family City & Home Address are copied automatically!',
+                      style: GoogleFonts.nunito(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: subColor,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryTeal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 22),
+                      label: Text(
+                        'Scan Family / Group QR Code',
+                        style: GoogleFonts.nunito(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      onPressed: () => _openDirectQrScanner(context),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primaryTeal,
+                        side: const BorderSide(
+                            color: AppColors.primaryTeal, width: 1.5),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.vpn_key_rounded, size: 20),
+                      label: Text(
+                        'Enter 6-Digit Invite Code',
+                        style: GoogleFonts.nunito(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      onPressed: () => context.push('/join-family'),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
 
-              // Option 3: Create Family (Becomes Admin)
-              Card(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => context.push('/create-family'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Row(
+              const SizedBox(height: 20),
+
+              // ===============================================================
+              // CHOICE 2: I DON'T HAVE A FAMILY / GROUP YET (CREATE AS ADMIN)
+              // ===============================================================
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppColors.accentCoral.withOpacity(isDark ? 0.15 : 0.08),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: AppColors.accentCoral,
+                    width: 1.8,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
                         Container(
-                          width: 52,
-                          height: 52,
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
-                            color: AppColors.primaryTeal.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(16),
+                            color: AppColors.accentCoral,
+                            borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Icon(
-                            Icons.home_rounded,
-                            color: AppColors.primaryTeal,
-                            size: 30,
+                            Icons.add_home_work_rounded,
+                            color: Colors.white,
+                            size: 26,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Create a New Family',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentCoralDark,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'OPTION 2 • START NEW AS ADMIN',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Start a private circle as Admin and invite loved ones',
-                                style: Theme.of(context).textTheme.bodySmall,
+                                '🏠 I Don\'t Have a Family / Group Yet',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w900,
+                                  color: onSurface,
+                                ),
                               ),
                             ],
                           ),
                         ),
-                        const Icon(Icons.arrow_forward_ios_rounded, size: 18),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Start a brand-new Family Circle, ✈️ Tour Group, 🛕 Temple / ⛪ Church Group, or ✨ Custom Group as Admin and get your QR code & 6-digit invite code to share.',
+                      style: GoogleFonts.nunito(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: subColor,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accentCoral,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.home_rounded, size: 22),
+                      label: Text(
+                        'Create New Family / Group (Admin)',
+                        style: GoogleFonts.nunito(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      onPressed: () => context.push('/create-family'),
+                    ),
+                  ],
                 ),
               ),
             ],

@@ -3,7 +3,9 @@ import '../../../core/errors/friendly_error.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../profile/presentation/profile_controller.dart';
 import '../domain/relation_type.dart';
 import 'family_controller.dart';
 import 'widgets/family_qr_scanner_modal.dart';
@@ -11,11 +13,15 @@ import 'widgets/family_qr_scanner_modal.dart';
 class JoinFamilyScreen extends ConsumerStatefulWidget {
   final String? initialCode;
   final String? initialFamilyName;
+  final String? initialAdminCity;
+  final String? initialAdminAddress;
 
   const JoinFamilyScreen({
     super.key,
     this.initialCode,
     this.initialFamilyName,
+    this.initialAdminCity,
+    this.initialAdminAddress,
   });
 
   @override
@@ -24,10 +30,28 @@ class JoinFamilyScreen extends ConsumerStatefulWidget {
 
 class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
   late final TextEditingController _codeController;
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _labelController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   RelationType _selectedRelation = RelationType.mother;
   String? _detectedFamilyName;
+  String? _inheritedAdminCity;
+  String? _inheritedAdminAddress;
+  String? _selectedBloodGroup;
+  DateTime? _selectedDob;
+  bool _populatedExisting = false;
+
+  static const List<String> _bloodGroups = [
+    'O+',
+    'O-',
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+  ];
 
   @override
   void initState() {
@@ -36,13 +60,47 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
       text: widget.initialCode?.trim().toUpperCase() ?? '',
     );
     _detectedFamilyName = widget.initialFamilyName;
+    _inheritedAdminCity = widget.initialAdminCity;
+    _inheritedAdminAddress = widget.initialAdminAddress;
   }
 
   @override
   void dispose() {
     _codeController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     _labelController.dispose();
     super.dispose();
+  }
+
+  void _populateFromExistingProfile() {
+    if (_populatedExisting) return;
+    final existing = ref.read(currentProfileProvider).value;
+    if (existing != null) {
+      _populatedExisting = true;
+      if (_nameController.text.isEmpty && existing.displayName.isNotEmpty) {
+        _nameController.text = existing.displayName;
+      }
+      if (_phoneController.text.isEmpty && existing.phone != null) {
+        _phoneController.text = existing.phone!;
+      }
+      _selectedBloodGroup ??= existing.bloodGroup;
+      _selectedDob ??= existing.dateOfBirth;
+    }
+  }
+
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDob ?? DateTime(1990, 1, 1),
+      firstDate: DateTime(1920, 1, 1),
+      lastDate: now,
+      helpText: 'Select Date of Birth (for Family Tree & Birthdays)',
+    );
+    if (picked != null) {
+      setState(() => _selectedDob = picked);
+    }
   }
 
   Future<void> _openQrScanner() async {
@@ -59,12 +117,18 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
         if (result.familyName != null && result.familyName!.isNotEmpty) {
           _detectedFamilyName = result.familyName;
         }
+        if (result.adminCity != null && result.adminCity!.isNotEmpty) {
+          _inheritedAdminCity = result.adminCity;
+        }
+        if (result.adminAddress != null && result.adminAddress!.isNotEmpty) {
+          _inheritedAdminAddress = result.adminAddress;
+        }
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             result.familyName != null
-                ? 'QR Scanned: ${result.familyName} (${result.code})! Choose your relation below.'
+                ? 'QR Scanned: ${result.familyName} (${result.code})! Family info copied automatically.'
                 : 'QR Scanned: Code ${result.code}! Choose your relation below.',
           ),
           backgroundColor: AppColors.success,
@@ -80,6 +144,50 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
         ParsedFamilyInvite(code: _codeController.text.trim().toUpperCase());
     final code = parsed.code;
     final customLabel = _labelController.text.trim();
+    final displayName = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final existing = ref.read(currentProfileProvider).value;
+
+    // 1. Save or update personal details + auto-copied Admin City/Address first
+    // so the foreign key on family_members(user_id -> profiles.id) is satisfied
+    // and the Admin sees the applicant's real name, blood group & DOB!
+    final profileSaved = await ref
+        .read(profileControllerProvider.notifier)
+        .saveProfile(
+          displayName: displayName,
+          phone: phone.isNotEmpty ? phone : existing?.phone,
+          whatsappNumber: phone.isNotEmpty ? phone : existing?.whatsappNumber,
+          avatarUrl: existing?.avatarUrl,
+          sex: existing?.sex,
+          dateOfBirth: _selectedDob ?? existing?.dateOfBirth,
+          bloodGroup: _selectedBloodGroup ?? existing?.bloodGroup,
+          livingPlace: parsed.adminCity ??
+              _inheritedAdminCity ??
+              existing?.livingPlace,
+          homeAddress: parsed.adminAddress ??
+              _inheritedAdminAddress ??
+              existing?.homeAddress,
+          city: parsed.adminCity ?? _inheritedAdminCity ?? existing?.city,
+          education: existing?.education,
+          occupation: existing?.occupation,
+          workingPlace: existing?.workingPlace,
+          workingDetails: existing?.workingDetails,
+          statusText: existing?.statusText ?? 'Available for family ❤️',
+          bioDescription: existing?.bioDescription,
+        );
+
+    if (!mounted) return;
+    if (!profileSaved) {
+      final pErr = ref.read(profileControllerProvider).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(friendlyError(pErr,
+              fallback: 'Could not save your profile details. Please try again.')),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     final success = await ref.read(familyControllerProvider.notifier).joinFamily(
           inviteCode: code,
@@ -111,8 +219,11 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _populateFromExistingProfile();
     final state = ref.watch(familyControllerProvider);
-    final isLoading = state.isLoading;
+    final profileState = ref.watch(profileControllerProvider);
+    final isLoading = state.isLoading || profileState.isLoading;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return Scaffold(
       appBar: AppBar(
@@ -164,10 +275,14 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
                                 ),
                               ),
                               Text(
-                                'Select your family relation below and tap Join.',
+                                (_inheritedAdminCity != null ||
+                                        _inheritedAdminAddress != null)
+                                    ? '🏠 Auto-copied Family Address: ${[_inheritedAdminCity, _inheritedAdminAddress].where((s) => s != null && s.isNotEmpty).join(" • ")}'
+                                    : 'Family general info (City & Home Address) copies from Admin automatically!',
                                 style: GoogleFonts.nunito(
                                   fontSize: 13,
-                                  color: AppColors.textSecondaryLight,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryTeal,
                                 ),
                               ),
                             ],
@@ -191,7 +306,7 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
                 const SizedBox(height: 20),
 
                 Text(
-                  'Family Invite Code',
+                  '1. Family / Group 6-Digit Invite Code',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -233,9 +348,110 @@ class _JoinFamilyScreenState extends ConsumerState<JoinFamilyScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 28),
+
+                const SizedBox(height: 22),
                 Text(
-                  'What is your relation in this family?',
+                  '2. Your Personal Details (Family Address Auto-Copies from Admin)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _nameController,
+                  style: GoogleFonts.nunito(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: onSurface,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Your Full Name / Display Name *',
+                    hintText: 'e.g. Anitha Kumar, Rahul, Amma',
+                    prefixIcon:
+                        Icon(Icons.badge_rounded, color: AppColors.primaryTeal),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().length < 2) {
+                      return 'Please enter your name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedBloodGroup,
+                        style: GoogleFonts.nunito(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: onSurface,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Blood Group',
+                          prefixIcon: Icon(Icons.bloodtype_rounded,
+                              color: AppColors.error),
+                        ),
+                        items: _bloodGroups
+                            .map((bg) => DropdownMenuItem(
+                                  value: bg,
+                                  child: Text(bg),
+                                ))
+                            .toList(),
+                        onChanged: (val) =>
+                            setState(() => _selectedBloodGroup = val),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: _pickDob,
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Date of Birth',
+                            prefixIcon: Icon(Icons.cake_rounded,
+                                color: AppColors.accentCoral),
+                          ),
+                          child: Text(
+                            _selectedDob != null
+                                ? DateFormat('d MMM yyyy').format(_selectedDob!)
+                                : 'Select DOB',
+                            style: GoogleFonts.nunito(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: _selectedDob != null
+                                  ? onSurface
+                                  : AppColors.textSecondaryLight,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: GoogleFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: onSurface,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Mobile / WhatsApp Number (Optional)',
+                    hintText: 'e.g. +65 9123 4567 / +91 98765 43210',
+                    prefixIcon:
+                        Icon(Icons.phone_rounded, color: AppColors.primaryTeal),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                Text(
+                  '3. What is your relation in this family / group?',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),

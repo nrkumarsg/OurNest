@@ -45,7 +45,16 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
       if (!mounted) return;
 
       if (profile == null || profile.displayName.isEmpty) {
-        context.go('/profile-setup');
+        final existingMembership = await ref
+            .read(familyRepositoryProvider)
+            .getCurrentUserMembership()
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
+        if (!mounted) return;
+        if (existingMembership == null) {
+          context.go('/family-entry');
+        } else {
+          context.go('/profile-setup');
+        }
         return;
       }
 
@@ -64,7 +73,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
       }
     } catch (_) {
       if (mounted) {
-        context.go('/profile-setup');
+        context.go('/family-entry');
       }
     }
   }
@@ -136,7 +145,7 @@ class _PhoneInputScreenState extends ConsumerState<PhoneInputScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Enter your email address. We will send you a 6-digit sign-in code.',
+                  'Enter your email address. We will send you a one-time verification code (6 to 8 digits).',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondaryLight,
                       ),

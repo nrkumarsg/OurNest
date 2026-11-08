@@ -66,7 +66,16 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       if (!mounted) return;
 
       if (profile == null || profile.displayName.isEmpty) {
-        context.go('/profile-setup');
+        final existingMembership = await ref
+            .read(familyRepositoryProvider)
+            .getCurrentUserMembership()
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
+        if (!mounted) return;
+        if (existingMembership == null) {
+          context.go('/family-entry');
+        } else {
+          context.go('/profile-setup');
+        }
         return;
       }
 
@@ -85,7 +94,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       }
     } catch (_) {
       if (mounted) {
-        context.go('/profile-setup');
+        context.go('/family-entry');
       }
     }
   }
@@ -96,7 +105,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              'Please enter the 6-digit code or paste the "Sign in" link from your email.'),
+              'Please enter the 6 to 8-digit verification code from your email.'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -114,14 +123,14 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       final error = ref.read(authControllerProvider).errorMessage;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error ?? 'Invalid or expired code/link. Please try again.'),
+          content: Text(error ?? 'Invalid or expired verification code. Please try again.'),
           backgroundColor: AppColors.error,
         ),
       );
     }
   }
 
-  Future<void> _pasteAndVerifySignInLink() async {
+  Future<void> _pasteAndVerifyCode() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final pasted = data?.text?.trim() ?? '';
     if (pasted.isEmpty) {
@@ -129,7 +138,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              'Clipboard is empty. Right-click or long-press "Sign in" in your email → Copy link, then tap here!'),
+              'Clipboard is empty. Copy the verification code from your email first, then tap Paste!'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -202,27 +211,32 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Enter the 6-digit code below, OR copy the "Sign in" link from your email and tap Paste below.',
+                'Enter the 6 to 8-digit verification code from your email below.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondaryLight,
                     ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              // Large legible OTP or Magic Link input
+              // Large legible 6-to-8 digit OTP input
               TextField(
                 controller: _otpController,
-                keyboardType: TextInputType.text,
+                keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 autofocus: true,
+                maxLength: 8,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
                 style: GoogleFonts.nunito(
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 3.0,
+                  letterSpacing: 4.0,
                   color: AppColors.primaryTeal,
                 ),
                 decoration: InputDecoration(
-                  hintText: '6-digit code or paste Sign-in link',
+                  counterText: '',
+                  hintText: 'Enter 6 or 8-digit code',
                   hintStyle: GoogleFonts.nunito(
                     fontSize: 16,
                     color: AppColors.textSecondaryLight.withOpacity(0.6),
@@ -231,10 +245,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 ),
                 onChanged: (val) {
                   final trimmed = val.trim();
-                  if (trimmed.length == 6 && int.tryParse(trimmed) != null) {
-                    _verify(trimmed);
-                  } else if (trimmed.startsWith('http') &&
-                      trimmed.contains('token=')) {
+                  // Automatically verify when an 8-digit code is completed
+                  // (6-digit codes can also be verified immediately via Verify & Continue)
+                  if (trimmed.length == 8 && int.tryParse(trimmed) != null) {
                     _verify(trimmed);
                   }
                 },
@@ -244,7 +257,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 icon: const Icon(Icons.content_paste_go_rounded,
                     color: AppColors.primaryTeal),
                 label: Text(
-                  '📋 Paste "Sign in" Link or Code from Email',
+                  '📋 Paste Verification Code from Email',
                   style: GoogleFonts.nunito(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
@@ -258,7 +271,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                onPressed: isLoading ? null : _pasteAndVerifySignInLink,
+                onPressed: isLoading ? null : _pasteAndVerifyCode,
               ),
               const SizedBox(height: 20),
               ElevatedButton(

@@ -39,7 +39,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             .timeout(const Duration(seconds: 3), onTimeout: () => null);
         if (!mounted) return;
         if (profile == null || profile.displayName.isEmpty) {
-          context.go('/profile-setup');
+          final existingMembership = await ref
+              .read(familyRepositoryProvider)
+              .getCurrentUserMembership()
+              .timeout(const Duration(seconds: 3), onTimeout: () => null);
+          if (!mounted) return;
+          if (existingMembership == null) {
+            context.go('/family-entry');
+          } else {
+            context.go('/profile-setup');
+          }
           return;
         }
 

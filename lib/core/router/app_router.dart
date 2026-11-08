@@ -68,9 +68,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final code = state.uri.queryParameters['code'];
           final name = state.uri.queryParameters['name'];
+          final city = state.uri.queryParameters['city'];
+          final addr = state.uri.queryParameters['addr'];
           return JoinFamilyScreen(
             initialCode: code,
             initialFamilyName: name,
+            initialAdminCity: city,
+            initialAdminAddress: addr,
           );
         },
       ),

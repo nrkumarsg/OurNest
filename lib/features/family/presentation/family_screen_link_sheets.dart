@@ -4,9 +4,14 @@ part of 'family_screen.dart';
 /// and Silent Curtain. Split out of family_screen.dart (audit F39); the code
 /// is unchanged and still runs as part of [_FamilyScreenState].
 extension _FamilyLinkSheets on _FamilyScreenState {
-  void _showLinkFamilySheet(BuildContext context, Family myFamily) {
-    final codeCtrl = TextEditingController();
-    final nameHintCtrl = TextEditingController();
+  void _showLinkFamilySheet(
+    BuildContext context,
+    Family myFamily, {
+    String? initialCode,
+    String? initialNameHint,
+  }) {
+    final codeCtrl = TextEditingController(text: initialCode ?? '');
+    final nameHintCtrl = TextEditingController(text: initialNameHint ?? '');
     String selectedRing = 'relative'; // 'relative' | 'friend' | 'community'
     String selectedBranch = "Brother's Family";
     String selectedPolicy = 'all_members';
@@ -18,8 +23,10 @@ extension _FamilyLinkSheets on _FamilyScreenState {
       "Paternal Side (Dad's Family)",
       "Grandparents' Nest",
       "Uncle / Aunt's Family",
-      "In-Laws' Family",
+      "Nephew / Niece's Family",
       "Cousin's Family",
+      "In-Laws' Family",
+      "Son / Daughter's Family",
     ];
 
     const friendPresets = [
@@ -208,9 +215,23 @@ extension _FamilyLinkSheets on _FamilyScreenState {
                         ),
                         icon: const Icon(Icons.qr_code_scanner_rounded),
                         label: const Text('Scan QR'),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _showInviteModal(context, myFamily, initialTab: 1);
+                        onPressed: () async {
+                          final scanned = await Navigator.of(context)
+                              .push<ParsedFamilyInvite>(
+                            MaterialPageRoute(
+                              fullscreenDialog: true,
+                              builder: (_) => const FamilyQrScannerModal(),
+                            ),
+                          );
+                          if (scanned != null && ctx.mounted) {
+                            setModalState(() {
+                              codeCtrl.text = scanned.code;
+                              if (scanned.familyName != null &&
+                                  scanned.familyName!.isNotEmpty) {
+                                nameHintCtrl.text = scanned.familyName!;
+                              }
+                            });
+                          }
                         },
                       ),
                     ],
