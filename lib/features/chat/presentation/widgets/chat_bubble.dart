@@ -232,6 +232,7 @@ class ChatBubble extends ConsumerWidget {
                   InteractiveChecklistCard.isChecklistMessage(
                       message.displayText)) ...[
                 InteractiveChecklistCard(
+                  messageId: message.id,
                   rawText: message.displayText,
                   isMine: isMine,
                   onUpdateChecklist: onUpdateChecklist,

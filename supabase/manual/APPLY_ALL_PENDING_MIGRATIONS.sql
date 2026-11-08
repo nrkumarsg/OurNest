@@ -612,3 +612,59 @@ alter table public.user_devices
   add constraint user_devices_platform_check
   check (platform in ('android', 'ios', 'web', 'windows', 'macos', 'linux'));
 
+-- -----------------------------------------------------------------------------
+-- PART 7: Shared Family Notepad & Grocery/Task Records (20261108000011)
+-- -----------------------------------------------------------------------------
+create table if not exists public.family_notes (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid references public.families(id) on delete cascade,
+  created_by uuid references public.profiles(id) on delete set null,
+  category text not null default 'grocery'
+    check (category in ('grocery', 'tasks', 'volunteer', 'note')),
+  title text not null default 'Grocery & Shopping List',
+  assigned_to text not null default 'All Family',
+  content text not null default '',
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+alter table public.family_notes enable row level security;
+
+drop policy if exists "Family members can view family notes" on public.family_notes;
+create policy "Family members can view family notes"
+  on public.family_notes
+  for select
+  using (
+    created_by = auth.uid()
+    or (family_id is not null and public.is_active_member(family_id))
+  );
+
+drop policy if exists "Family members can insert family notes" on public.family_notes;
+create policy "Family members can insert family notes"
+  on public.family_notes
+  for insert
+  with check (
+    auth.uid() is not null
+    and (created_by is null or created_by = auth.uid())
+    and (family_id is null or public.is_active_member(family_id))
+  );
+
+drop policy if exists "Family members can update family notes" on public.family_notes;
+create policy "Family members can update family notes"
+  on public.family_notes
+  for update
+  using (
+    created_by = auth.uid()
+    or (family_id is not null and public.is_active_member(family_id))
+  );
+
+drop policy if exists "Family members can delete family notes" on public.family_notes;
+create policy "Family members can delete family notes"
+  on public.family_notes
+  for delete
+  using (
+    created_by = auth.uid()
+    or (family_id is not null and public.is_active_member(family_id))
+  );
+
+
