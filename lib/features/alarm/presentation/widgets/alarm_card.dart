@@ -55,8 +55,25 @@ class AlarmCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final membership = ref.watch(currentMembershipProvider).value;
+    final activeMembers = ref.watch(activeMembersProvider);
     final familyId = membership?.familyId;
     final myUserId = membership?.userId ?? '';
+
+    // Resolve the actual names of the phones that will ring
+    final participantMembers = activeMembers
+        .where((m) =>
+            alarm.participants.isEmpty ||
+            alarm.participants.contains(m.userId))
+        .toList();
+    final ringingPhoneNames = participantMembers.isNotEmpty
+        ? participantMembers.map((m) {
+            final isMe = m.userId == myUserId;
+            return isMe
+                ? '${m.displayName} (You)'
+                : '${m.displayName} (${m.formattedRelation})';
+          }).join(' + ')
+        : (alarm.ownerName ?? 'Your Phone');
+
     // Status follows later "I'm awake" / cancel events in the chat.
     final status =
         ref.watch(alarmStatusOverridesProvider)[alarm.alarmId] ?? alarm.status;
@@ -67,13 +84,14 @@ class AlarmCard extends ConsumerWidget {
     Color cardBorderColor = AppColors.accentCoral;
     Color statusBadgeColor = AppColors.accentCoral.withOpacity(0.15);
     Color statusTextColor = AppColors.accentCoralDark;
-    String statusText = '⏰ Rings at ${alarm.formattedTime}';
+    String statusText =
+        '⏰ Rings on ${participantMembers.length <= 1 ? "1 Phone" : "${participantMembers.length} Phones"} at ${alarm.formattedTime}';
 
     if (isAck) {
       cardBorderColor = AppColors.success;
       statusBadgeColor = AppColors.success.withOpacity(0.15);
       statusTextColor = AppColors.success;
-      statusText = '✓ ${alarm.ownerName ?? "Member"} is awake!';
+      statusText = '✓ Confirmed Awake — All phones silenced!';
     } else if (isEscalated) {
       cardBorderColor = AppColors.error;
       statusBadgeColor = AppColors.error.withOpacity(0.15);
@@ -83,7 +101,7 @@ class AlarmCard extends ConsumerWidget {
       cardBorderColor = AppColors.dividerLight;
       statusBadgeColor = AppColors.dividerLight;
       statusTextColor = AppColors.textSecondaryLight;
-      statusText = 'Cancelled';
+      statusText = '🔕 Alarm Cancelled';
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -95,7 +113,7 @@ class AlarmCard extends ConsumerWidget {
     return Container(
       width: 280,
       margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(18),
@@ -135,7 +153,7 @@ class AlarmCard extends ConsumerWidget {
                   Text(
                     alarm.formattedTime,
                     style: GoogleFonts.nunito(
-                      fontSize: 26,
+                      fontSize: 25,
                       fontWeight: FontWeight.w900,
                       color: textPrimary,
                     ),
@@ -158,24 +176,46 @@ class AlarmCard extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           // Label
           Text(
             alarm.label,
             style: GoogleFonts.nunito(
               fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               color: textPrimary,
             ),
           ),
           Text(
-            '${alarm.formattedDate} • Ring Both Phones (${alarm.escalateAfterMin}m follow-up)',
+            '📅 ${alarm.formattedDate} (${alarm.escalateAfterMin == 0 ? "Rings Together" : "${alarm.escalateAfterMin}m follow-up"})',
             style: GoogleFonts.nunito(
               fontSize: 12.5,
+              fontWeight: FontWeight.w700,
               color: textSecondary,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
+          // EXPLICIT CONFIRMATION OF WHICH PHONES WILL RING
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.primaryTeal.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppColors.primaryTeal.withOpacity(0.3),
+              ),
+            ),
+            child: Text(
+              '📲 Phones Ringing: $ringingPhoneNames',
+              style: GoogleFonts.nunito(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.tealAccent : AppColors.primaryTeal,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // Status Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -186,39 +226,64 @@ class AlarmCard extends ConsumerWidget {
             child: Text(
               statusText,
               style: GoogleFonts.nunito(
-                fontSize: 12.5,
+                fontSize: 12,
                 fontWeight: FontWeight.w800,
                 color: statusTextColor,
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          // Action Buttons: [Cancel] & [Test Ring]
+          const SizedBox(height: 8),
+          // Action Buttons wrapped cleanly so "Cancel Alarm" never overflows
           if (!isAck && !isCancelled)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              alignment: WrapAlignment.end,
               children: [
-                // Owner can confirm "I'm awake" from the chat too, which
-                // cancels every participant's escalation alarm (F05).
                 if (alarm.isOwner(myUserId))
-                  TextButton(
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      minimumSize: const Size(0, 32),
+                    ),
+                    icon: const Icon(Icons.check_circle_outline_rounded,
+                        size: 16, color: AppColors.success),
+                    label: const Text(
+                      "I'm awake ✓",
+                      style: TextStyle(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
                     onPressed: familyId == null
                         ? null
                         : () => ref
                             .read(alarmControllerProvider.notifier)
                             .acknowledgeAlarm(
                                 familyId: familyId, alarmId: alarm.alarmId),
-                    child: const Text("I'm awake ✓",
-                        style: TextStyle(color: AppColors.success)),
                   ),
-                TextButton(
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: const Size(0, 32),
+                  ),
+                  icon: const Icon(Icons.notifications_off_outlined,
+                      size: 16, color: AppColors.error),
+                  label: Text(
+                    alarm.isOwner(myUserId) ? 'Cancel Alarm' : 'Silence Phone',
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
                   onPressed: familyId == null
                       ? null
                       : () => _confirmCancel(context, ref, familyId,
                           forEveryone: alarm.isOwner(myUserId)),
-                  child: Text(
-                      alarm.isOwner(myUserId) ? 'Cancel Alarm' : 'Silence on my phone',
-                      style: const TextStyle(color: AppColors.error)),
                 ),
               ],
             ),

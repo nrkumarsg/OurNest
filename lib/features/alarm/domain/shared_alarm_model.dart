@@ -51,7 +51,9 @@ class SharedAlarm {
   String get formattedDate => DateFormat('EEE, MMM d').format(time);
 
   bool isOwner(String currentUserId) => ownerId == currentUserId;
-  bool isParticipant(String currentUserId) => participants.contains(currentUserId);
+  bool isParticipant(String currentUserId) =>
+      currentUserId.isNotEmpty &&
+      (participants.isEmpty || participants.contains(currentUserId));
 
   factory SharedAlarm.fromJson(Map<String, dynamic> json) {
     return SharedAlarm(

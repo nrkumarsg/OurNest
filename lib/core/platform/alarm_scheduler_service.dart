@@ -23,10 +23,14 @@ class AlarmNotificationTap {
 enum ReminderScheduleResult { scheduled, inPast, unsupported }
 
 class AlarmSchedulerService {
-  static const String _alarmChannelId = 'ournest_exact_alarms_v2';
+  static const String _alarmChannelId = 'ournest_exact_alarms_v3';
   static const String _alarmChannelName = 'OurNest Loud Wake-Up Alarms';
   static const MethodChannel _buzzerChannel =
       MethodChannel('com.ournest.app/alarm_buzzer');
+  static final Int64List _alarmVibrationPattern =
+      Int64List.fromList([0, 1000, 500, 1000, 500, 1000, 500, 1200]);
+  static final Int32List _insistentNotificationFlag =
+      Int32List.fromList([4]); // Notification.FLAG_INSISTENT = 4
 
   /// Payload prefixes. MainActivity.kt only allows lock-screen display for
   /// notifications whose payload starts with one of these.
@@ -129,12 +133,13 @@ class AlarmSchedulerService {
               AndroidFlutterLocalNotificationsPlugin>();
 
       await androidImplementation?.createNotificationChannel(
-        const AndroidNotificationChannel(
+        AndroidNotificationChannel(
           _alarmChannelId,
           _alarmChannelName,
           description: 'Full-screen shared family alarms and wake-up escalation',
           importance: Importance.max,
           enableVibration: true,
+          vibrationPattern: _alarmVibrationPattern,
           playSound: true,
           audioAttributesUsage: AudioAttributesUsage.alarm,
         ),
@@ -156,9 +161,12 @@ class AlarmSchedulerService {
     required bool isOwner,
   }) {
     _foregroundTimers[alarm.alarmId]?.cancel();
-    final delay = alarm.time.difference(DateTime.now());
-    if (delay.isNegative) return;
-    _foregroundTimers[alarm.alarmId] = Timer(delay, () {
+    final rawDelay = alarm.time.difference(DateTime.now());
+    // If the alarm was set for more than 90 seconds in the past, ignore it
+    if (rawDelay.inSeconds < -90) return;
+    final effectiveDelay =
+        rawDelay.isNegative ? const Duration(milliseconds: 300) : rawDelay;
+    _foregroundTimers[alarm.alarmId] = Timer(effectiveDelay, () {
       startBuzzer();
       onForegroundAlarmRing?.call(
         AlarmNotificationTap(alarm, isEscalation: !isOwner),
@@ -174,8 +182,11 @@ class AlarmSchedulerService {
   }) async {
     final isOwner = alarm.isOwner(currentUserId);
     final isParticipant = alarm.isParticipant(currentUserId);
+    final now = DateTime.now();
+    final isDueOrUpcoming =
+        alarm.time.isAfter(now.subtract(const Duration(seconds: 90)));
 
-    if ((isOwner || isParticipant) && alarm.time.isAfter(DateTime.now())) {
+    if ((isOwner || isParticipant) && isDueOrUpcoming) {
       _scheduleForegroundBuzzerTimer(alarm: alarm, isOwner: isOwner);
     }
 
@@ -183,7 +194,10 @@ class AlarmSchedulerService {
     await init();
 
     // 1. Primary alarm at the exact time on BOTH phones (owner + all participants)
-    if ((isOwner || isParticipant) && alarm.time.isAfter(DateTime.now())) {
+    if ((isOwner || isParticipant) && isDueOrUpcoming) {
+      final scheduleTime = alarm.time.isAfter(now.add(const Duration(seconds: 2)))
+          ? alarm.time
+          : now.add(const Duration(seconds: 2));
       await _notifications.zonedSchedule(
         ringId(alarm.alarmId),
         isOwner
@@ -192,8 +206,8 @@ class AlarmSchedulerService {
         isOwner
             ? 'Time to wake up! Tap "I\'m awake" to confirm.'
             : 'Shared wake-up alarm is ringing! Tap to open or call.',
-        tz.TZDateTime.from(alarm.time, tz.local),
-        const NotificationDetails(
+        tz.TZDateTime.from(scheduleTime, tz.local),
+        NotificationDetails(
           android: AndroidNotificationDetails(
             _alarmChannelId,
             _alarmChannelName,
@@ -204,10 +218,12 @@ class AlarmSchedulerService {
             autoCancel: false,
             playSound: true,
             enableVibration: true,
+            vibrationPattern: _alarmVibrationPattern,
+            additionalFlags: _insistentNotificationFlag,
             category: AndroidNotificationCategory.alarm,
             audioAttributesUsage: AudioAttributesUsage.alarm,
           ),
-          iOS: DarwinNotificationDetails(
+          iOS: const DarwinNotificationDetails(
             presentAlert: true,
             presentSound: true,
             interruptionLevel: InterruptionLevel.timeSensitive,
@@ -225,25 +241,29 @@ class AlarmSchedulerService {
     if (!isOwner &&
         isParticipant &&
         alarm.escalateAfterMin > 0 &&
-        alarm.escalationTime.isAfter(DateTime.now())) {
+        alarm.escalationTime.isAfter(now)) {
       await _notifications.zonedSchedule(
         escalationId(alarm.alarmId),
         '🚨 Escalation: ${alarm.ownerName ?? "Family Member"} hasn\'t woken up!',
         'Tap to call them now.',
         tz.TZDateTime.from(alarm.escalationTime, tz.local),
-        const NotificationDetails(
+        NotificationDetails(
           android: AndroidNotificationDetails(
             _alarmChannelId,
             _alarmChannelName,
             importance: Importance.max,
             priority: Priority.max,
             fullScreenIntent: true,
+            ongoing: true,
+            autoCancel: false,
             playSound: true,
             enableVibration: true,
+            vibrationPattern: _alarmVibrationPattern,
+            additionalFlags: _insistentNotificationFlag,
             category: AndroidNotificationCategory.alarm,
             audioAttributesUsage: AudioAttributesUsage.alarm,
           ),
-          iOS: DarwinNotificationDetails(
+          iOS: const DarwinNotificationDetails(
             presentAlert: true,
             presentSound: true,
             interruptionLevel: InterruptionLevel.timeSensitive,
